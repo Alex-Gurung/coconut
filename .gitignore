@@ -1,0 +1,8 @@
+__pycache__/
+./data/
+.claude/
+wandb/
+*.zip
+*.json
+ncp_data/
+checkpoints/
