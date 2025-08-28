@@ -1,0 +1,42 @@
+# Coconut training config for Qwen dataset - all values justified
+
+# General settings
+project: "qwen_coconut_training"           # Descriptive project name for wandb
+save_path: "/mnt/disk/coconut/checkpoints" # Directory to save model checkpoints
+only_eval: False                           # Train mode (not evaluation only)
+
+# Method - use coconut directly (skip CoT since Qwen2.5-7B-Instruct already reasons well)
+coconut: True    # Enable coconut training method
+cot: False       # Skip CoT stage - your data already has reasoning from capable model
+no_thoughts: False
+no_cot: False
+
+# Training settings
+c_thought: 2                    # JUSTIFIED: Same as GSM8K (2). Start conservative, can increase
+epochs_per_stage: 3             # JUSTIFIED: Matches GSM8K successful config
+max_latent_stage: 3             # JUSTIFIED: GSM8K uses 3, good for gradual complexity increase
+pad_latent_to_max: True         # JUSTIFIED: Handle varying reasoning step counts (5-34 in your data)
+save_only_improve: False        # JUSTIFIED: Coconut paper recommends False to save all stages
+uniform_prob: 0.0               # JUSTIFIED: Standard training (0.3 used for analysis experiments)
+
+# Model initialization  
+model_id: "Qwen/Qwen2.5-7B-Instruct"  # JUSTIFIED: Your actual base model that generated the data
+load_model_path: ""                    # JUSTIFIED: Starting fresh (no CoT checkpoint to load)
+
+# Training control
+seed: 42                        # JUSTIFIED: Reproducibility
+resume: 0                       # JUSTIFIED: Starting from beginning
+bf16: True                      # JUSTIFIED: Memory efficiency for 7B model
+
+# Dataset paths
+train_path: "ncp_data/your_dataset_train.json"  # Your transformed training data
+val_path: "ncp_data/your_dataset_val.json"      # Your transformed validation data
+
+# Optimizer settings - ADJUSTED based on analysis
+reset_optimizer: False          # JUSTIFIED: Maintain optimizer state across stages
+batch_size_training: 2          # JUSTIFIED: Conservative for 7B model memory constraints
+debug: False                    # JUSTIFIED: Full training (set True for quick testing)
+gradient_accumulation_steps: 4  # JUSTIFIED: Achieve effective batch size despite memory limits
+num_epochs: 20                  # JUSTIFIED: Maximum epochs (early stopping likely)
+lr: 1e-4                        # JUSTIFIED: Matches existing configs (1e-4 = 0.0001)
+weight_decay: 0.01              # JUSTIFIED: Standard regularization for fine-tuning

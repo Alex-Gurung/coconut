@@ -1,0 +1,39 @@
+# Resume config for Coconut training from checkpoint_1
+# This config manually resumes from checkpoint_1 and continues training from epoch 1
+
+project: coconut
+save_path: /mnt/disk/coconut/checkpoints  
+name: qwen-coconut-resume                  # DIFFERENT NAME: Prevents auto-resume behavior
+
+only_eval: False
+
+# Performance optimizations  
+use_ddp: False                            # FSDP for memory efficiency on 7B model
+torch_compile: False                      # Disabled due to CUDAGraphs conflict
+
+coconut: True
+cot: False
+no_thoughts: False
+no_cot: False
+
+c_thought: 2
+epochs_per_stage: 1                      # 1 epoch per stage for speed  
+max_latent_stage: 2                      # 2 stages total (0, 1)
+pad_latent_to_max: True
+
+save_only_improve: False
+uniform_prob: 0.0
+model_id: Qwen/Qwen2.5-7B-Instruct
+load_model_path: "/mnt/disk/coconut/checkpoints/qwen-coconut-resume/checkpoint_2"  # RESUME: Load from checkpoint_2 (after epochs 0,1)
+seed: 0  
+resume: 2                                # RESUME: Start from epoch 2 (checkpoint_2 completed epochs 0,1)
+bf16: True
+train_path: ncp_data/your_dataset_train.json
+val_path: ncp_data/your_dataset_val.json
+reset_optimizer: True
+batch_size_training: 1
+debug: False
+gradient_accumulation_steps: 32           # Effective batch size: 1 * 4 GPUs * 32 = 128
+num_epochs: 4                            # Total epochs (will run epochs 1, 2, 3 - three remaining)
+lr: !!float "1e-4"
+weight_decay: 0.01

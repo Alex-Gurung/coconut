@@ -1,0 +1,38 @@
+# Coconut config based on GSM8K - minimal necessary changes only
+
+project: coconut
+save_path: /mnt/disk/coconut/checkpoints  # CHANGED: Your actual save path
+name: qwen-coconut                        # CHANGED: Descriptive name
+
+only_eval: False
+
+# Performance optimizations
+use_ddp: False                            # CHANGED: Back to FSDP due to OOM with DDP
+torch_compile: False                      # DISABLED: Causes issues with gradient accumulation
+
+coconut: True
+cot: False
+no_thoughts: False
+no_cot: False
+
+c_thought: 2
+epochs_per_stage: 1                      # CHANGED: Only 1 epoch per stage for speed
+max_latent_stage: 2                      # CHANGED: Only 2 stages total for speed
+pad_latent_to_max: True
+
+save_only_improve: False
+uniform_prob: 0.0
+model_id: Qwen/Qwen2.5-7B-Instruct       # CHANGED: Your model instead of gpt2
+load_model_path: "None"                   # CHANGED: No CoT checkpoint to load (starting fresh)
+seed: 0
+resume: 0                                 # CHANGED: Start from beginning (GSM resumes from epoch 3)
+bf16: True                                # CHANGED: True for 7B model efficiency (GSM uses False for gpt2)
+train_path: ncp_data/your_dataset_train.json  # CHANGED: Your data path
+val_path: ncp_data/your_dataset_val.json      # CHANGED: Your data path
+reset_optimizer: True
+batch_size_training: 1                    # CHANGED: Increase since we'll use DDP instead of FSDP
+debug: False
+gradient_accumulation_steps: 32            # CHANGED: Adjust for new batch size: 4*4*8=128
+num_epochs: 4                            # CHANGED: Stage 0(1 epoch) + Stage 1(1 epoch) + Stage 2(2 epochs)
+lr: !!float "1e-4"
+weight_decay: 0.01

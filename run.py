@@ -1,6 +1,14 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 
+# Apply Liger kernel optimizations globally before model loading
+try:
+    from liger_kernel.transformers import apply_liger_kernel_to_qwen2
+    apply_liger_kernel_to_qwen2()
+    print("✓ Applied Liger kernel optimizations globally")
+except Exception as e:
+    print(f"Could not apply Liger kernels: {e}")
+
 import torch
 import torch.distributed
 import torch.optim as optim
@@ -100,7 +108,14 @@ def main():
             f"Loading from {configs.load_model_path} and skip the first {configs.resume} epochs"
         )
 
-    model = AutoModelForCausalLM.from_pretrained(configs.model_id)
+    # Load model with Flash Attention 2 for speed
+    model = AutoModelForCausalLM.from_pretrained(
+        configs.model_id,
+        attn_implementation="flash_attention_2",
+        torch_dtype=torch.bfloat16 if configs.bf16 else torch.float16,
+        device_map=None,  # We handle device placement manually
+    )
+    print("✓ Loaded model with Flash Attention 2")
     tokenizer = AutoTokenizer.from_pretrained(configs.model_id)
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.add_tokens("<|start-latent|>")
@@ -180,16 +195,22 @@ def main():
     if configs.bf16:
         model.to(torch.bfloat16)
 
-    # if only eval, use ddp (to avoid bugs in fsdp)
-    if configs.only_eval:
+    # Use DDP if specified in config or for eval, otherwise use FSDP
+    if configs.only_eval or getattr(configs, 'use_ddp', False):
         parallel_model = DDP(model, device_ids=[rank])
-
+        print(f"Using DDP on rank {rank}")
     else:
         parallel_model = FSDP(
             model, auto_wrap_policy=llama_auto_wrap_policy, device_id=rank
         )
+        print(f"Using FSDP on rank {rank}")
 
     del model
+
+    # Apply torch.compile if specified
+    if getattr(configs, 'torch_compile', False):
+        print(f"Applying torch.compile on rank {rank}")
+        parallel_model = torch.compile(parallel_model, mode='reduce-overhead')
 
     if rank == 0:
         print(parallel_model)

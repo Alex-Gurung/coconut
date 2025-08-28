@@ -1,0 +1,34 @@
+# Coconut config based on GSM8K - minimal necessary changes only
+
+project: coconut
+save_path: /mnt/disk/coconut/checkpoints  # CHANGED: Your actual save path
+name: qwen-coconut                        # CHANGED: Descriptive name
+
+only_eval: False
+
+coconut: True
+cot: False
+no_thoughts: False
+no_cot: False
+
+c_thought: 2
+epochs_per_stage: 3
+max_latent_stage: 3
+pad_latent_to_max: True
+
+save_only_improve: False
+uniform_prob: 0.0
+model_id: Qwen/Qwen2.5-7B-Instruct       # CHANGED: Your model instead of gpt2
+load_model_path: ""                       # CHANGED: No CoT checkpoint to load (starting fresh)
+seed: 0
+resume: 0                                 # CHANGED: Start from beginning (GSM resumes from epoch 3)
+bf16: True                                # CHANGED: True for 7B model efficiency (GSM uses False for gpt2)
+train_path: ncp_data/your_dataset_train.json  # CHANGED: Your data path
+val_path: ncp_data/your_dataset_val.json      # CHANGED: Your data path
+reset_optimizer: True
+batch_size_training: 8                    # CHANGED: Smaller than GSM's 32 due to 7B model size
+debug: False
+gradient_accumulation_steps: 4            # CHANGED: Higher than GSM's 1 to compensate for smaller batch
+num_epochs: 25
+lr: !!float "1e-4"
+weight_decay: 0.01
