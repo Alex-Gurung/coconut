@@ -1,3 +1,4 @@
+./coconut_model_hf/
 __pycache__/
 ./data/
 .claude/
