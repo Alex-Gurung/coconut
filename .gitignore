@@ -1,6 +1,6 @@
-./coconut_model_hf/
+coconut_model_hf/
 __pycache__/
-./data/
+data/
 .claude/
 wandb/
 *.zip
