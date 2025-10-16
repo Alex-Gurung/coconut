@@ -484,42 +484,49 @@ def main():
                 total += 1
 
                 # synced_gpus=True in FSDP mode, as we need to keep # forward pass the same on each device
-                outputs = parallel_model.module.generate(
-                    **batch,
-                    max_new_tokens=max_new_tokens,
-                    synced_gpus=not configs.only_eval,
-                )
+                # outputs = parallel_model.module.generate(
+                #     **batch,
+                #     max_new_tokens=max_new_tokens,
+                #     synced_gpus=not configs.only_eval,
+                # )
 
-                text_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
-                answer_output = text_output.split("#")[-1].replace(",", "").strip()
-                cot_output = (
-                    ("\n".join(text_output.split("\n")[1:])).split("#")[0].strip()
-                )
+                # text_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
+                # answer_output = text_output.split("#")[-1].replace(",", "").strip()
+                # cot_output = (
+                #     ("\n".join(text_output.split("\n")[1:])).split("#")[0].strip()
+                # )
 
                 # Save evaluation outputs (only on rank 0 to avoid duplicates)
-                if rank == 0:
-                    eval_outputs.append({
-                        "idx": test_idx.cpu().item(),
-                        "question": question,
-                        "ground_truth_answer": answer,
-                        "ground_truth_cot": answer_cot,
-                        "generated_output": text_output,
-                        "extracted_answer": answer_output,
-                        "extracted_cot": cot_output,
-                        "answer_correct": answer_output == answer,
-                        "cot_match": cot_output == answer_cot,
-                    })
+                # if rank == 0:
+                #    eval_outputs.append({
+                #        "idx": test_idx.cpu().item(),
+                #        "question": question,
+                #        "ground_truth_answer": answer,
+                #        "ground_truth_cot": answer_cot,
+                #        "generated_output": text_output,
+                #        "extracted_answer": answer_output,
+                #        "extracted_cot": cot_output,
+                #        "answer_correct": answer_output == answer,
+                #        "cot_match": cot_output == answer_cot,
+                #    })
 
-                if idx < 5 and rank == 0:
-                    # print some examples
-                    print(
-                        f"Question {test_idx}: Answer = '{answer}' CoT = '{answer_cot}'"
-                    )
-                    print(f"Full output: '{tokenizer.decode(outputs[0])}'")
-                    print(f"Extracted Output: '{answer_output}'")
+                #if idx < 5 and rank == 0:
+                #    # print some examples
+                #    print(
+                #        f"Question {test_idx}: Answer = '{answer}' CoT = '{answer_cot}'"
+                #    )
+                #    print(f"Full output: '{tokenizer.decode(outputs[0])}'")
+                #    print(f"Extracted Output: '{answer_output}'")
+                # if idx < 5 and rank == 0:
+                #     # print some examples
+                #     print(
+                #         f"Question {test_idx}: Answer = '{answer}' CoT = '{answer_cot}'"
+                #     )
+                #     print(f"Full output: '{tokenizer.decode(outputs[0])}'")
+                #     print(f"Extracted Output: '{answer_output}'")
 
-                cor += answer_output == answer
-                cor_cot += cot_output == answer_cot
+                # cor += answer_output == answer
+                # cor_cot += cot_output == answer_cot
 
                 pbar.update(1)
                 pbar.set_description(
