@@ -23,12 +23,12 @@ pad_latent_to_max: True
 save_only_improve: False
 uniform_prob: 0.0
 model_id: Qwen/Qwen2.5-7B-Instruct       # CHANGED: Your model instead of gpt2
-load_model_path:                    # CHANGED: No CoT checkpoint to load (starting fresh)
+load_model_path: /mnt/disk/coconut/checkpoints/qwen-coconut-resume/checkpoint_3                    # CHANGED: No CoT checkpoint to load (starting fresh)
 seed: 0
 resume: 0                                 # CHANGED: Start from beginning (GSM resumes from epoch 3)
 bf16: True                                # CHANGED: True for 7B model efficiency (GSM uses False for gpt2)
-train_path: ncp_data/your_dataset_train.json  # CHANGED: Your data path
-val_path: ncp_data/your_dataset_val.json      # CHANGED: Your data path
+train_path: ncp_rl_data/your_dataset_train.json  # CHANGED: Your data path
+val_path: ncp_rl_data/your_dataset_test.json     # CHANGED: Using test set for evaluation
 reset_optimizer: True
 batch_size_training: 1                    # CHANGED: Increase since we'll use DDP instead of FSDP
 debug: False

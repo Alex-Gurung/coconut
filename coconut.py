@@ -234,8 +234,14 @@ class Coconut(nn.Module):
         new_inputs_embeds = torch.cat((inputs_embeds, new_token_embed), dim=1)
 
         # get other tokens
+        past_key_values = None
         for _ in range(max_new_tokens - 1):
-            outputs = self.base_causallm(inputs_embeds=new_inputs_embeds)
+            outputs = self.base_causallm(
+                inputs_embeds=new_inputs_embeds if past_key_values is None else new_token_embed,
+                past_key_values=past_key_values,
+                use_cache=True
+            )
+            past_key_values = outputs.past_key_values
             self.gen_forward_cnt += 1
             next_token = torch.argmax(outputs.logits[0, -1]).item()
             if next_token == self.eos_token_id:
@@ -244,7 +250,6 @@ class Coconut(nn.Module):
             new_token_embed = self.embedding(
                 torch.tensor(next_token, device=input_ids.device)
             ).view(1, 1, -1)
-            new_inputs_embeds = torch.cat((new_inputs_embeds, new_token_embed), dim=1)
 
         if synced_gpus:
             # in FSDP, the number of forward pass need to be the same across devices

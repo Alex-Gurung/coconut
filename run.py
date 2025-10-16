@@ -111,7 +111,8 @@ def main():
     # Load model with Flash Attention 2 for speed
     model = AutoModelForCausalLM.from_pretrained(
         configs.model_id,
-        attn_implementation="flash_attention_2",
+        # attn_implementation="flash_attention_2",
+        attn_implementation="flash_attention_3",
         torch_dtype=torch.bfloat16 if configs.bf16 else torch.float16,
         device_map=None,  # We handle device placement manually
     )
@@ -234,7 +235,7 @@ def main():
     if "gsm" in configs.val_path:
         max_new_tokens = 64
     else:
-        max_new_tokens = 128
+        max_new_tokens = 2048
 
     total_train_steps = 0
 
@@ -259,6 +260,9 @@ def main():
     best_acc = 0
 
     collator = MyCollator(tokenizer, latent_id=latent_id, label_pad_token_id=-100)
+
+    # For saving evaluation outputs
+    eval_outputs = []
 
     for epoch in range(configs.resume, configs.num_epochs):
 
@@ -492,6 +496,20 @@ def main():
                     ("\n".join(text_output.split("\n")[1:])).split("#")[0].strip()
                 )
 
+                # Save evaluation outputs (only on rank 0 to avoid duplicates)
+                if rank == 0:
+                    eval_outputs.append({
+                        "idx": test_idx.cpu().item(),
+                        "question": question,
+                        "ground_truth_answer": answer,
+                        "ground_truth_cot": answer_cot,
+                        "generated_output": text_output,
+                        "extracted_answer": answer_output,
+                        "extracted_cot": cot_output,
+                        "answer_correct": answer_output == answer,
+                        "cot_match": cot_output == answer_cot,
+                    })
+
                 if idx < 5 and rank == 0:
                     # print some examples
                     print(
@@ -525,6 +543,22 @@ def main():
 
         if wandb_run:
             wandb_run.log({"eval/acc": cor / total, "eval/cot_em": cor_cot / total})
+
+        # Save evaluation outputs to JSON file
+        if configs.only_eval and rank == 0:
+            output_file = os.path.join(save_dir, "eval_outputs.json")
+            with open(output_file, "w") as f:
+                json.dump({
+                    "config": config_dict,
+                    "checkpoint": configs.load_model_path,
+                    "accuracy": cor / total,
+                    "cot_exact_match": cor_cot / total,
+                    "total_samples": total,
+                    "correct_answers": cor,
+                    "cot_matches": cor_cot,
+                    "outputs": eval_outputs
+                }, f, indent=2)
+            print(f"\n✓ Saved evaluation outputs to: {output_file}")
 
         if configs.only_eval:
             break

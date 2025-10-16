@@ -60,18 +60,19 @@ def get_dataset(path, tokenizer, max_size=1000000000):
             tokenize_sample, remove_columns=list(dataset.features), num_proc=32
         )
 
-    # verify
+    # verify (only if steps and answer are non-empty)
     d = data[0]
-    complete = d["question"] + "\n" + "\n".join(d["steps"]) + "\n### " + d["answer"]
-    complete_tokenized = tokenizer.encode(complete, add_special_tokens=True) + [
-        tokenizer.eos_token_id
-    ]
-    assert (
-        complete_tokenized
-        == dataset[0]["question_tokenized"]
-        + list(itertools.chain.from_iterable(dataset[0]["steps_tokenized"]))
-        + dataset[0]["answer_tokenized"]
-    )
+    if d["steps"] or d["answer"]:
+        complete = d["question"] + "\n" + "\n".join(d["steps"]) + "\n### " + d["answer"]
+        complete_tokenized = tokenizer.encode(complete, add_special_tokens=True) + [
+            tokenizer.eos_token_id
+        ]
+        assert (
+            complete_tokenized
+            == dataset[0]["question_tokenized"]
+            + list(itertools.chain.from_iterable(dataset[0]["steps_tokenized"]))
+            + dataset[0]["answer_tokenized"]
+        )
 
     return dataset
 
