@@ -6,6 +6,7 @@ import torch.nn as nn
 from torch.nn import CrossEntropyLoss
 from collections import namedtuple
 from transformers.models.gpt2 import GPT2LMHeadModel
+from transformers.cache_utils import Cache, DynamicCache
 
 Outputs = namedtuple("Outputs", ["loss", "inputs_embeds", "logits"])
 MAX_N_LATENT = 8
@@ -80,13 +81,21 @@ class Coconut(nn.Module):
 
             else:
                 # extract kv cache to reuse
-                past_key_values = [
+                if isinstance(kv_cache, Cache):
+                    legacy_cache = kv_cache.to_legacy_cache()
+                else:
+                    legacy_cache = kv_cache
+
+                past_key_values = tuple(
                     (
                         k[:, :, : next_compute_range[0], :],
                         v[:, :, : next_compute_range[0], :],
                     )
-                    for k, v in kv_cache
-                ]
+                    for k, v in legacy_cache
+                )
+
+                if isinstance(kv_cache, Cache):
+                    past_key_values = DynamicCache.from_legacy_cache(past_key_values)
 
                 outputs = self.base_causallm(
                     inputs_embeds=inputs_embeds[
@@ -158,23 +167,34 @@ class Coconut(nn.Module):
             )
 
         # final pass
+        if kv_cache and isinstance(kv_cache, Cache):
+            legacy_cache = kv_cache.to_legacy_cache()
+            past_key_values = tuple(
+                (
+                    k[:, :, : next_compute_range[0], :],
+                    v[:, :, : next_compute_range[0], :],
+                )
+                for k, v in legacy_cache
+            )
+            past_key_values = DynamicCache.from_legacy_cache(past_key_values)
+        elif kv_cache:
+            past_key_values = tuple(
+                (
+                    k[:, :, : next_compute_range[0], :],
+                    v[:, :, : next_compute_range[0], :],
+                )
+                for k, v in kv_cache
+            )
+        else:
+            past_key_values = None
+
         outputs = self.base_causallm(
             inputs_embeds=inputs_embeds[
                 :, next_compute_range[0] : next_compute_range[1], :
             ],
             attention_mask=attention_mask[:, : next_compute_range[1]],
             position_ids=position_ids[:, next_compute_range[0] : next_compute_range[1]],
-            past_key_values=(
-                [
-                    (
-                        k[:, :, : next_compute_range[0], :],
-                        v[:, :, : next_compute_range[0], :],
-                    )
-                    for k, v in kv_cache
-                ]
-                if kv_cache
-                else None
-            ),
+            past_key_values=past_key_values,
             output_hidden_states=True,
         )
 
