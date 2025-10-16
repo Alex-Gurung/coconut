@@ -1,0 +1,41 @@
+# Coconut training - following ProntoQA pattern for long reasoning chains
+project: coconut
+save_path: /mnt/disk/coconut/checkpoints
+name: qwen-coconut-v2
+
+only_eval: False
+use_ddp: False
+# use_ddp: True 
+torch_compile: False
+
+coconut: True
+cot: False
+no_thoughts: False
+no_cot: False
+
+# Coconut curriculum settings
+# c_thought: 2  # 2 latent tokens per reasoning step
+c_thought: 1  # 2 latent tokens per reasoning step
+epochs_per_stage: 2  # 2 epochs at each compression level
+max_latent_stage: 5  # Compress up to 5 steps (out of ~12 total)
+pad_latent_to_max: True
+
+save_only_improve: False
+uniform_prob: 0.0  # Proper curriculum learning
+
+model_id: Qwen/Qwen2.5-7B-Instruct
+load_model_path: "/mnt/disk/coconut/checkpoints/qwen-coconut-v2/checkpoint_2" 
+seed: 42
+resume: 3
+bf16: True
+
+train_path: ncp_data/your_dataset_train.json
+val_path: ncp_data/your_dataset_test.json
+
+reset_optimizer: True
+batch_size_training: 1  # Per GPU
+debug: False
+gradient_accumulation_steps: 64  # 1 * 2 GPUs * 64 = 128 effective batch
+num_epochs: 14  # Stage 0-5 (12 epochs) + 2 extra at max stage
+lr: !!float "5e-5"
+weight_decay: 0.01
