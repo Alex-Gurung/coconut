@@ -126,6 +126,8 @@ def main():
     start_id = tokenizer.convert_tokens_to_ids("<|start-latent|>")
     end_id = tokenizer.convert_tokens_to_ids("<|end-latent|>")
 
+    model.gradient_checkpointing_enable()
+
     loaded = False
 
     if configs.load_model_path != "None":
