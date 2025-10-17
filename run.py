@@ -483,7 +483,7 @@ def main():
 
                 total += 1
 
-                synced_gpus=True in FSDP mode, as we need to keep # forward pass the same on each device
+                # synced_gpus=True in FSDP mode, as we need to keep # forward pass the same on each device
                 outputs = parallel_model.module.generate(
                     **batch,
                     max_new_tokens=max_new_tokens,
