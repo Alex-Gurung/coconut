@@ -261,10 +261,10 @@ def main():
 
     collator = MyCollator(tokenizer, latent_id=latent_id, label_pad_token_id=-100)
 
-    # For saving evaluation outputs
-    eval_outputs = []
-
     for epoch in range(configs.resume, configs.num_epochs):
+
+        # For saving evaluation outputs per epoch
+        eval_outputs = []
 
         scheduled_stage = (
             0 if (configs.cot or configs.no_cot) else epoch // configs.epochs_per_stage
@@ -496,19 +496,17 @@ def main():
                     ("\n".join(text_output.split("\n")[1:])).split("#")[0].strip()
                 )
 
-                # Save evaluation outputs (only on rank 0 to avoid duplicates)
-                if rank == 0:
-                   eval_outputs.append({
-                       "idx": test_idx.cpu().item(),
-                       "question": question,
-                       "ground_truth_answer": answer,
-                       "ground_truth_cot": answer_cot,
-                       "generated_output": text_output,
-                       "extracted_answer": answer_output,
-                       "extracted_cot": cot_output,
-                       "answer_correct": answer_output == answer,
-                       "cot_match": cot_output == answer_cot,
-                   })
+                eval_outputs.append({
+                    "idx": test_idx.cpu().item(),
+                    "question": question,
+                    "ground_truth_answer": answer,
+                    "ground_truth_cot": answer_cot,
+                    "generated_output": text_output,
+                    "extracted_answer": answer_output,
+                    "extracted_cot": cot_output,
+                    "answer_correct": answer_output == answer,
+                    "cot_match": cot_output == answer_cot,
+                })
 
                 if idx < 5 and rank == 0:
                    # print some examples
@@ -551,6 +549,15 @@ def main():
         if wandb_run:
             wandb_run.log({"eval/acc": cor / total, "eval/cot_em": cor_cot / total})
 
+        outputs_to_save = None
+        if configs.only_eval:
+            gathered_eval_outputs = [None for _ in range(world_size)]
+            dist.all_gather_object(gathered_eval_outputs, eval_outputs)
+            if rank == 0:
+                outputs_to_save = [
+                    entry for shard in gathered_eval_outputs for entry in shard
+                ]
+
         # Save evaluation outputs to JSON file
         if configs.only_eval and rank == 0:
             output_file = os.path.join(save_dir, "eval_outputs.json")
@@ -563,7 +570,7 @@ def main():
                     "total_samples": total,
                     "correct_answers": cor,
                     "cot_matches": cor_cot,
-                    "outputs": eval_outputs
+                    "outputs": outputs_to_save if outputs_to_save is not None else eval_outputs
                 }, f, indent=2)
             print(f"\n✓ Saved evaluation outputs to: {output_file}")
 
