@@ -1,0 +1,39 @@
+# Coconut evaluation derived from qwen_coconut_train_resume5.yaml
+project: coconut
+save_path: /mnt/disk/coconut/checkpoints
+name: qwen-coconut-v2-eval
+
+only_eval: True
+use_ddp: False
+torch_compile: False
+
+coconut: True
+cot: False
+no_thoughts: False
+no_cot: False
+
+# Curriculum settings (unused during eval but kept for compatibility)
+c_thought: 1
+epochs_per_stage: 2
+max_latent_stage: 5
+pad_latent_to_max: True
+
+save_only_improve: False
+uniform_prob: 0.0
+
+model_id: Qwen/Qwen2.5-7B-Instruct
+load_model_path: "/mnt/disk/coconut/checkpoints/qwen-coconut-v2/checkpoint_4"
+seed: 42
+resume: 0
+bf16: True
+
+train_path: ncp_data/your_dataset_train.json
+val_path: ncp_rl_data/your_dataset_test.json
+
+reset_optimizer: True
+batch_size_training: 1
+debug: False
+gradient_accumulation_steps: 64
+num_epochs: 1
+lr: !!float "5e-5"
+weight_decay: 0.01
