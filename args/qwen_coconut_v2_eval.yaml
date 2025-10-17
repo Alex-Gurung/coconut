@@ -24,7 +24,7 @@ uniform_prob: 0.0
 model_id: Qwen/Qwen2.5-7B-Instruct
 load_model_path: "/mnt/disk/coconut/checkpoints/qwen-coconut-v2/checkpoint_4"
 seed: 42
-resume: 4
+resume: 5
 bf16: True
 
 train_path: ncp_data/your_dataset_train.json
@@ -34,6 +34,6 @@ reset_optimizer: True
 batch_size_training: 1
 debug: False
 gradient_accumulation_steps: 64
-num_epochs: 1
+num_epochs: 14
 lr: !!float "5e-5"
 weight_decay: 0.01
