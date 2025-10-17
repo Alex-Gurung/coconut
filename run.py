@@ -496,7 +496,7 @@ def main():
                     ("\n".join(text_output.split("\n")[1:])).split("#")[0].strip()
                 )
 
-                Save evaluation outputs (only on rank 0 to avoid duplicates)
+                # Save evaluation outputs (only on rank 0 to avoid duplicates)
                 if rank == 0:
                    eval_outputs.append({
                        "idx": test_idx.cpu().item(),
