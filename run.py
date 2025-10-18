@@ -589,7 +589,8 @@ def main():
 
         dist.barrier()
         if (
-            cor / total > best_acc
+            total > 0 and
+            (cor / total) > best_acc
             and configs.save_only_improve
             and not configs.debug
             and not configs.only_eval
@@ -600,7 +601,7 @@ def main():
                 torch.save(states, os.path.join(save_dir, f"checkpoint_{epoch + 1}"))
                 print("saving model.")
 
-            best_acc = cor / total
+            best_acc = cor / total if total > 0 else 0
 
             dist.barrier()
             del states
