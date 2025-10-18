@@ -92,7 +92,6 @@ def get_dataset(path, tokenizer, max_size=1000000000, use_chat_template=False):
                 print("Question text:", sample["question"])
                 print("Assistant content:", assistant_content)
                 print("Decoded combined tokens:", tokenizer.decode(joined_tokens))
-            x = 1/0
 
         else:
             question_tokenized = tokenizer.encode(
