@@ -551,12 +551,13 @@ def main():
         cor = cor.item()
         total = total.item()
         if rank == 0:
-            print(f"Accuracy on validation set: {cor} / {total} = {cor/total}")
-            print(f"CoT match on validation set: {cor_cot} / {total} = {cor_cot/total}")
+            accuracy = cor / total if total > 0 else 0
+            cot_match = cor_cot / total if total > 0 else 0
+            print(f"Accuracy on validation set: {cor} / {total} = {accuracy}")
+            print(f"CoT match on validation set: {cor_cot} / {total} = {cot_match}")
         sys.stdout.flush()
-
         if wandb_run:
-            wandb_run.log({"eval/acc": cor / total, "eval/cot_em": cor_cot / total})
+            wandb_run.log({"eval/acc": accuracy, "eval/cot_em": cot_match})
 
         outputs_to_save = None
         if configs.only_eval:
