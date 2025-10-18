@@ -37,8 +37,8 @@ def split_reasoning_into_steps(reasoning_text, nlp):
     # Clean each step and filter out very short or repetitive ones
     steps = []
     for step in raw_steps:
-        cleaned_step = clean_step_text(step)
-        
+        # cleaned_step = clean_step_text(step)
+        cleaned_step = step
         # Skip if too short, just punctuation, or empty after cleaning
         if (len(cleaned_step) > 15 and 
             not re.match(r'^[:\s\.,;!?]*$', cleaned_step) and

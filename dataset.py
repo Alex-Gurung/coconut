@@ -3,6 +3,7 @@
 
 import json
 import itertools
+import os
 import random
 from dataclasses import dataclass
 from typing import Optional
@@ -14,20 +15,99 @@ from transformers import PreTrainedTokenizerBase
 from transformers.data.data_collator import pad_without_fast_tokenizer_warning
 
 
-def get_dataset(path, tokenizer, max_size=1000000000):
+def get_dataset(path, tokenizer, max_size=1000000000, use_chat_template=False):
 
     def tokenize_sample(sample):
 
-        question_tokenized = tokenizer.encode(
-            sample["question"] + "\n", add_special_tokens=True
-        )
-        steps_tokenized = [
-            tokenizer.encode(s + "\n", add_special_tokens=False)
-            for s in sample["steps"]
-        ]
-        answer_tokenized = tokenizer.encode(
-            "### " + sample["answer"], add_special_tokens=False
-        ) + [tokenizer.eos_token_id]
+        if use_chat_template:
+            if not hasattr(tokenizer, "apply_chat_template"):
+                raise ValueError(
+                    "Tokenizer does not support chat templates but `use_chat_template` is True."
+                )
+
+            user_message = {"role": "user", "content": sample["question"]}
+
+            question_tokenized = list(
+                tokenizer.apply_chat_template(
+                    [user_message], tokenize=True, add_generation_prompt=True
+                )
+            )
+
+            assistant_content_parts = []
+            steps_tokenized = []
+
+            for step in sample["steps"]:
+                assistant_content_parts.append(step + "\n")
+
+            assistant_content_parts.append("In summary, " + sample["answer"])
+            assistant_content = "".join(assistant_content_parts)
+
+            assistant_message = {
+                "role": "assistant",
+                "content": assistant_content,
+            }
+
+            full_tokens = list(
+                tokenizer.apply_chat_template(
+                    [user_message, assistant_message],
+                    tokenize=True,
+                    add_generation_prompt=False,
+                )
+            )
+
+            assistant_tokens = full_tokens[len(question_tokenized) :]
+
+            offset = 0
+            for step in sample["steps"]:
+                step_text = step + "\n"
+                step_tokens = tokenizer.encode(step_text, add_special_tokens=False)
+                span = assistant_tokens[offset : offset + len(step_tokens)]
+                if len(span) != len(step_tokens):
+                    raise ValueError(
+                        "Mismatch between chat template assistant tokens and plain tokenization for steps."
+                    )
+                steps_tokenized.append(list(span))
+                offset += len(step_tokens)
+
+            # answer_text = "### " + sample["answer"]
+            answer_text = "In summary, " + sample["answer"]
+            answer_no_eos = tokenizer.encode(answer_text, add_special_tokens=False)
+            answer_span = assistant_tokens[offset : offset + len(answer_no_eos)]
+            if len(answer_span) != len(answer_no_eos):
+                answer_span = answer_no_eos
+            offset += len(answer_span)
+            leftover = assistant_tokens[offset:]
+            answer_tokenized = list(answer_span) + list(leftover) + [
+                tokenizer.eos_token_id
+            ]
+            offset += len(leftover)
+
+            if sample["idx"] == 0:
+                joined_tokens = (
+                    question_tokenized
+                    + list(itertools.chain.from_iterable(steps_tokenized))
+                    + answer_tokenized
+                )
+                print("=== Chat template debug (first sample) ===")
+                print("Question text:", sample["question"])
+                print("Assistant content:", assistant_content)
+                print("Decoded combined tokens:", tokenizer.decode(joined_tokens))
+            x = 1/0
+
+        else:
+            question_tokenized = tokenizer.encode(
+                sample["question"] + "\n", add_special_tokens=True
+            )
+            steps_tokenized = [
+                tokenizer.encode(s + "\n", add_special_tokens=False)
+                for s in sample["steps"]
+            ]
+            # answer_tokenized = tokenizer.encode(
+            #     "### " + sample["answer"], add_special_tokens=False
+            # ) + [tokenizer.eos_token_id]
+            answer_tokenized = tokenizer.encode(
+                "In summary, " + sample["answer"], add_special_tokens=False
+            ) + [tokenizer.eos_token_id]
 
         sample = {
             "question_tokenized": question_tokenized,
@@ -63,10 +143,26 @@ def get_dataset(path, tokenizer, max_size=1000000000):
     # verify (only if steps and answer are non-empty)
     d = data[0]
     if d["steps"] or d["answer"]:
-        complete = d["question"] + "\n" + "\n".join(d["steps"]) + "\n### " + d["answer"]
-        complete_tokenized = tokenizer.encode(complete, add_special_tokens=True) + [
-            tokenizer.eos_token_id
-        ]
+        if use_chat_template and hasattr(tokenizer, "apply_chat_template"):
+            user_message = {"role": "user", "content": d["question"]}
+            assistant_content = ""
+            if d["steps"]:
+                assistant_content += "\n".join(d["steps"]) + "\n"
+            # assistant_content += "### " + d["answer"]
+            assistant_content += "In summary, " + d["answer"]
+            conversation = [
+                user_message,
+                {"role": "assistant", "content": assistant_content},
+            ]
+            complete_tokenized = tokenizer.apply_chat_template(
+                conversation, tokenize=True, add_generation_prompt=False
+            ) + [tokenizer.eos_token_id]
+        else:
+            # complete = d["question"] + "\n" + "\n".join(d["steps"]) + "\n### " + d["answer"]
+            complete = d["question"] + "\n" + "\n".join(d["steps"]) + "\nIn summary, " + d["answer"]
+            complete_tokenized = tokenizer.encode(complete, add_special_tokens=True) + [
+                tokenizer.eos_token_id
+            ]
         assert (
             complete_tokenized
             == dataset[0]["question_tokenized"]

@@ -11,6 +11,7 @@ coconut: True
 cot: False
 no_thoughts: False
 no_cot: False
+use_chat_template: False
 
 # Curriculum settings (unused during eval but kept for compatibility)
 c_thought: 1

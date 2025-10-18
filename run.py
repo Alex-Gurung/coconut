@@ -223,13 +223,21 @@ def main():
     ]
     cot_val = ["\n".join(d["steps"]) for d in json.load(open(configs.val_path))]
 
+    use_chat_template = getattr(configs, "use_chat_template", False)
+
     base_dataset_valid = get_dataset(
-        configs.val_path, tokenizer, max_size=32 if configs.debug else 100000000
+        configs.val_path,
+        tokenizer,
+        max_size=32 if configs.debug else 100000000,
+        use_chat_template=use_chat_template,
     )
 
     if not configs.only_eval:
         base_dataset_train = get_dataset(
-            configs.train_path, tokenizer, max_size=5000 if configs.debug else 100000000
+            configs.train_path,
+            tokenizer,
+            max_size=5000 if configs.debug else 100000000,
+            use_chat_template=use_chat_template,
         )
 
     if "gsm" in configs.val_path:
