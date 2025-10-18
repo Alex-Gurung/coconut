@@ -575,8 +575,8 @@ def main():
                 json.dump({
                     "config": config_dict,
                     "checkpoint": configs.load_model_path,
-                    "accuracy": cor / total,
-                    "cot_exact_match": cor_cot / total,
+                    "accuracy": cor / total if total > 0 else 0,
+                    "cot_exact_match": cor_cot / total if total > 0 else 0,
                     "total_samples": total,
                     "correct_answers": cor,
                     "cot_matches": cor_cot,
