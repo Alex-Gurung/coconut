@@ -111,8 +111,8 @@ def main():
     # Load model with Flash Attention 2 for speed
     model = AutoModelForCausalLM.from_pretrained(
         configs.model_id,
-        # attn_implementation="flash_attention_2",
-        attn_implementation="flash_attention_3",
+        attn_implementation="flash_attention_2",
+        # attn_implementation="flash_attention_3",
         torch_dtype=torch.bfloat16 if configs.bf16 else torch.float16,
         device_map=None,  # We handle device placement manually
     )
