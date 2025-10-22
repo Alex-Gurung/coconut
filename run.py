@@ -269,7 +269,14 @@ def main():
 
     collator = MyCollator(tokenizer, latent_id=latent_id, label_pad_token_id=-100)
 
-    for epoch in range(configs.resume, configs.num_epochs):
+    # When only_eval=True, ensure we run the evaluation exactly once.
+    # Using `resume` as the epoch index preserves scheduled_stage behavior.
+    if configs.only_eval:
+        epoch_iter = [configs.resume]
+    else:
+        epoch_iter = range(configs.resume, configs.num_epochs)
+
+    for epoch in epoch_iter:
 
         # For saving evaluation outputs per epoch
         eval_outputs = []
@@ -608,6 +615,13 @@ def main():
             gc.collect()
             torch.cuda.empty_cache()
 
+
+    # Cleanly shut down the process group to avoid warnings on exit
+    try:
+        if dist.is_initialized():
+            dist.destroy_process_group()
+    except Exception:
+        pass
 
 if __name__ == "__main__":
     main()
