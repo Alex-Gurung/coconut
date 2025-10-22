@@ -3,7 +3,7 @@ project: coconut
 save_path: /mnt/disk/coconut/checkpoints
 name: qwenmusr-coconut-v3
 
-only_eval: True
+only_eval: False
 use_ddp: False
 # use_ddp: True 
 torch_compile: False
@@ -17,16 +17,16 @@ use_chat_template: True
 # c_thought: 2  # 2 latent tokens per reasoning step
 c_thought: 1  # 2 latent tokens per reasoning step
 epochs_per_stage: 1  # 2 epochs at each compression level
-max_latent_stage: 10  # Compress up to 5 steps (out of ~12 total)
+max_latent_stage: 20  # Compress up to 5 steps (out of ~12 total)
 pad_latent_to_max: True
 
 save_only_improve: False
 uniform_prob: 0.0  # Proper curriculum learning
 
 model_id: Qwen/Qwen2.5-7B-Instruct
-load_model_path: None  # Start from scratch
+load_model_path: "/mnt/disk/coconut/checkpoints/qwenmusr-coconut-v3/checkpoint10" # Start from scratch
 seed: 42
-resume: 0
+resume: 10
 bf16: True
 
 train_path: musr_data/musr_train.json
