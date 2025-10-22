@@ -24,9 +24,10 @@ save_only_improve: False
 uniform_prob: 0.0  # Proper curriculum learning
 
 model_id: Qwen/Qwen2.5-7B-Instruct
-load_model_path: None  # Start from scratch
+load_model_path: "/mnt/disk/coconut/checkpoints/qwenmusr-coconut-v3/checkpoint_20"  # Start from scratch
 seed: 42
-resume: 0
+# resume: 0
+resume: 20
 bf16: True
 
 # train_path: musr_data/musr_train.json
@@ -38,6 +39,6 @@ reset_optimizer: True
 batch_size_training: 1  # Per GPU
 debug: False
 gradient_accumulation_steps: 64  # 1 * 2 GPUs * 64 = 128 effective batch
-num_epochs: 14  # Stage 0-5 (12 epochs) + 2 extra at max stage
+num_epochs: 20 # Stage 0-5 (12 epochs) + 2 extra at max stage
 lr: !!float "5e-5"
 weight_decay: 0.01
