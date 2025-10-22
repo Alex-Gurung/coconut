@@ -3,7 +3,7 @@ project: coconut
 save_path: /mnt/disk/coconut/checkpoints
 name: qwenmusr-coconut-v3
 
-only_eval: False
+only_eval: True
 use_ddp: False
 # use_ddp: True 
 torch_compile: False
