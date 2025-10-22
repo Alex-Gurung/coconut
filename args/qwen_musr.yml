@@ -27,7 +27,7 @@ model_id: Qwen/Qwen2.5-7B-Instruct
 load_model_path: "/mnt/disk/coconut/checkpoints/qwenmusr-coconut-v3/checkpoint_20"  # Start from scratch
 seed: 42
 # resume: 0
-resume: 20
+resume: 21
 bf16: True
 
 # train_path: musr_data/musr_train.json
