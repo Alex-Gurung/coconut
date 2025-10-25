@@ -42,6 +42,51 @@ import gc
 import argparse
 import functools
 from utils import Config, set_seed
+import re
+from typing import Optional
+
+# Regex and helpers for extracting boxed answers from model outputs
+BOXED_RE = re.compile(r"\\boxed\{([^}]*)\}", re.IGNORECASE)
+
+
+def extract_last_boxed(text: str) -> Optional[str]:
+    matches = list(BOXED_RE.finditer(text or ""))
+    if matches:
+        return matches[-1].group(1).strip()
+    return None
+
+
+def parse_prediction(raw_text: str) -> float:
+    """
+    Map the model's raw output to a binary prediction.
+    Defaults to searching the final boxed answer, then falls back to the raw text.
+    Returns 1.0 for affirmative (contains 'yes' and not 'no'), else 0.0.
+    """
+    candidate = extract_last_boxed(raw_text)
+    if not candidate:
+        candidate = raw_text or ""
+    candidate = candidate.lower()
+    return 1.0 if ("yes" in candidate and "no" not in candidate) else 0.0
+
+
+def safe_int_from_text(text: str) -> Optional[int]:
+    """Best-effort to extract an integer from text. Returns None if not found."""
+    if text is None:
+        return None
+    txt = str(text).strip()
+    # direct cast
+    try:
+        return int(txt)
+    except Exception:
+        pass
+    # find last signed integer in the text
+    nums = re.findall(r"-?\d+", txt)
+    if nums:
+        try:
+            return int(nums[-1])
+        except Exception:
+            return None
+    return None
 
 
 def main():
@@ -480,75 +525,100 @@ def main():
         )
 
         # UNCOMMENT TO EVALUATE
-        with torch.no_grad():
-            parallel_model.module.eval()
-            for idx, batch in enumerate(valid_gen_dataloader):
-                test_idx = batch["idx"][0]
+        # with torch.no_grad():
+        #     parallel_model.module.eval()
+        #     for idx, batch in enumerate(valid_gen_dataloader):
+        #         test_idx = batch["idx"][0]
 
-                batch = {
-                    k: v.to(rank)
-                    for k, v in batch.items()
-                    if v != None and k not in ["idx", "position_ids"]
-                }
-                # https://github.com/huggingface/transformers/issues/32492
+        #         batch = {
+        #             k: v.to(rank)
+        #             for k, v in batch.items()
+        #             if v != None and k not in ["idx", "position_ids"]
+        #         }
+        #         # https://github.com/huggingface/transformers/issues/32492
 
-                assert len(batch["input_ids"]) == 1
-                answer = answers_val[test_idx.cpu().item()]
-                answer_cot = cot_val[test_idx.cpu().item()]
-                question = question_val[test_idx.cpu().item()]
+        #         assert len(batch["input_ids"]) == 1
+        #         answer = answers_val[test_idx.cpu().item()]
+        #         answer_cot = cot_val[test_idx.cpu().item()]
+        #         question = question_val[test_idx.cpu().item()]
 
-                total += 1
+        #         total += 1
 
-                # synced_gpus=True in FSDP mode, as we need to keep # forward pass the same on each device
-                outputs = parallel_model.module.generate(
-                    **batch,
-                    max_new_tokens=max_new_tokens,
-                    synced_gpus=not configs.only_eval,
-                )
+        #         # synced_gpus=True in FSDP mode, as we need to keep # forward pass the same on each device
+        #         outputs = parallel_model.module.generate(
+        #             **batch,
+        #             max_new_tokens=max_new_tokens,
+        #             synced_gpus=not configs.only_eval,
+        #         )
 
-                text_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
-                answer_output = text_output.split("#")[-1].replace(",", "").strip()
-                cot_output = (
-                    ("\n".join(text_output.split("\n")[1:])).split("#")[0].strip()
-                )
+        #         text_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        #         # Default extraction (legacy): take text after last '#'
+        #         default_extracted_answer = (
+        #             text_output.split("#")[-1].replace(",", "").strip()
+        #         )
+        #         cot_output = (
+        #             ("\n".join(text_output.split("\n")[1:])).split("#")[0].strip()
+        #         )
 
-                eval_outputs.append({
-                    "idx": test_idx.cpu().item(),
-                    "question": question,
-                    "ground_truth_answer": answer,
-                    "ground_truth_cot": answer_cot,
-                    "generated_output": text_output,
-                    "extracted_answer": answer_output,
-                    "extracted_cot": cot_output,
-                    "answer_correct": answer_output == answer,
-                    "cot_match": cot_output == answer_cot,
-                })
+        #         # Conditionally use boxed answer extraction
+        #         use_boxed = getattr(configs, "use_boxed_answer", True)
+        #         boxed_extracted = extract_last_boxed(text_output) if use_boxed else None
+        #         answer_output = boxed_extracted if boxed_extracted else default_extracted_answer
 
-                if idx < 5 and rank == 0:
-                   # print some examples
-                   print(
-                       f"Question {test_idx}: Answer = '{answer}' CoT = '{answer_cot}'"
-                   )
-                   print(f"Full output: '{tokenizer.decode(outputs[0])}'")
-                   print(f"Extracted Output: '{answer_output}'")
-                if idx < 5 and rank == 0:
-                    # print some examples
-                    print(
-                        f"Question {test_idx}: Answer = '{answer}' CoT = '{answer_cot}'"
-                    )
-                    print(f"Full output: '{tokenizer.decode(outputs[0])}'")
-                    print(f"Extracted Output: '{answer_output}'")
+        #         # Determine correctness
+        #         if use_boxed:
+        #             # Compare as integers when using boxed answers, with robust fallbacks
+        #             pred_int = safe_int_from_text(answer_output)
+        #             if pred_int is None:
+        #                 # Fall back to yes/no style parsing -> numeric
+        #                 pred_int = int(parse_prediction(text_output))
 
-                cor += answer_output == answer
-                cor_cot += cot_output == answer_cot
+        #             gt_int = safe_int_from_text(answer)
+        #             if gt_int is None:
+        #                 gt_int = int(parse_prediction(answer))
 
-                pbar.update(1)
-                pbar.set_description(
-                    f"Test accuracy: {round(float(cor.detach().float() / total.detach().float()), 2)}"
-                )
+        #             ans_correct = (pred_int is not None) and (gt_int is not None) and (pred_int == gt_int)
+        #         else:
+        #             ans_correct = answer_output == answer
 
-            pbar.close()
-            print(f"Device {rank}: Cor={cor}, CoT={cor_cot}, Total={total}")
+        #         eval_outputs.append({
+        #             "idx": test_idx.cpu().item(),
+        #             "question": question,
+        #             "ground_truth_answer": answer,
+        #             "ground_truth_cot": answer_cot,
+        #             "generated_output": text_output,
+        #             "extracted_answer": answer_output,
+        #             "boxed_extracted_answer": boxed_extracted,
+        #             "extracted_cot": cot_output,
+        #             "answer_correct": ans_correct,
+        #             "cot_match": cot_output == answer_cot,
+        #         })
+
+        #         if idx < 5 and rank == 0:
+        #            # print some examples
+        #            print(
+        #                f"Question {test_idx}: Answer = '{answer}' CoT = '{answer_cot}'"
+        #            )
+        #            print(f"Full output: '{tokenizer.decode(outputs[0])}'")
+        #            print(f"Extracted Output: '{answer_output}'")
+        #         if idx < 5 and rank == 0:
+        #             # print some examples
+        #             print(
+        #                 f"Question {test_idx}: Answer = '{answer}' CoT = '{answer_cot}'"
+        #             )
+        #             print(f"Full output: '{tokenizer.decode(outputs[0])}'")
+        #             print(f"Extracted Output: '{answer_output}'")
+
+        #         cor += 1 if ans_correct else 0
+        #         cor_cot += cot_output == answer_cot
+
+        #         pbar.update(1)
+        #         pbar.set_description(
+        #             f"Test accuracy: {round(float(cor.detach().float() / total.detach().float()), 2)}"
+        #         )
+
+        #     pbar.close()
+        #     print(f"Device {rank}: Cor={cor}, CoT={cor_cot}, Total={total}")
 
         dist.all_reduce(cor_cot, op=dist.ReduceOp.SUM)
         dist.all_reduce(cor, op=dist.ReduceOp.SUM)
