@@ -12,6 +12,7 @@ cot: False
 no_thoughts: False
 no_cot: False
 use_chat_template: True
+use_boxed_answer: True
 
 # Curriculum settings (unused during eval but kept for compatibility)
 c_thought: 1
@@ -38,4 +39,3 @@ gradient_accumulation_steps: 64
 num_epochs: 14
 lr: !!float "5e-5"
 weight_decay: 0.01
-

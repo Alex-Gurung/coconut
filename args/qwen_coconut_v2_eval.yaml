@@ -12,6 +12,7 @@ cot: False
 no_thoughts: False
 no_cot: False
 use_chat_template: False
+use_boxed_answer: False
 
 # Curriculum settings (unused during eval but kept for compatibility)
 c_thought: 1

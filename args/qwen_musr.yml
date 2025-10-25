@@ -13,6 +13,8 @@ cot: False
 no_thoughts: False
 no_cot: False
 use_chat_template: True
+# Evaluation: require boxed final answers (default True)
+use_boxed_answer: False
 # Coconut curriculum settings
 # c_thought: 2  # 2 latent tokens per reasoning step
 c_thought: 1  # 2 latent tokens per reasoning step
