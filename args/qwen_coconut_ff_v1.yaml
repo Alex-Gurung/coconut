@@ -1,11 +1,11 @@
 # Coconut training - following ProntoQA pattern for long reasoning chains
 project: coconut
 save_path: /mnt/disk/coconut/checkpoints
-name: qwenmusr-coconut-v3
+name: qwen-coconut-ff-v1
 
-only_eval: True
-use_ddp: False
-# use_ddp: True 
+only_eval: False
+  # use_ddp: False
+use_ddp: True 
 torch_compile: False
 
 coconut: True
@@ -13,34 +13,31 @@ cot: False
 no_thoughts: False
 no_cot: False
 use_chat_template: True
+use_boxed_answer: True
+
 # Coconut curriculum settings
 # c_thought: 2  # 2 latent tokens per reasoning step
 c_thought: 1  # 2 latent tokens per reasoning step
-epochs_per_stage: 1  # 2 epochs at each compression level
-max_latent_stage: 10  # Compress up to 5 steps (out of ~12 total)
+epochs_per_stage: 2  # 2 epochs at each compression level
+max_latent_stage: 5  # Compress up to 5 steps (out of ~12 total)
 pad_latent_to_max: True
 
 save_only_improve: False
 uniform_prob: 0.0  # Proper curriculum learning
 
 model_id: Qwen/Qwen2.5-7B-Instruct
-  # load_model_path: "/mnt/disk/coconut/checkpoints/qwenmusr-coconut-v3/checkpoint_20"  # Start from scratch
-load_model_path: "/mnt/disk/coconut/checkpoints/qwenmusr-coconut-v3/checkpoint_11"  # Start from scratch
+load_model_path: None  # Start from scratch
 seed: 42
-# resume: 0
-# resume: 21
-resume: 11
+resume: 0
 bf16: True
 
-# train_path: musr_data/musr_train.json
-# val_path: musr_data/musr_val.json
-train_path: musr_rl_data/musr_train.json
-val_path: musr_rl_data/musr_test.json
+train_path: ff_data/train.json
+val_path: ff_data/val.json
 
 reset_optimizer: True
 batch_size_training: 1  # Per GPU
 debug: False
 gradient_accumulation_steps: 64  # 1 * 2 GPUs * 64 = 128 effective batch
-num_epochs: 20 # Stage 0-5 (12 epochs) + 2 extra at max stage
+num_epochs: 14  # Stage 0-5 (12 epochs) + 2 extra at max stage
 lr: !!float "5e-5"
 weight_decay: 0.01
