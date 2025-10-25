@@ -31,8 +31,8 @@ seed: 42
 resume: 14
 bf16: True
 
-train_path: ff_data/train.json
-val_path: ff_data/val.json
+train_path: ff_rl_data/train.json
+val_path: ff_rl_data/val.json
 
 reset_optimizer: True
 batch_size_training: 1  # Per GPU
