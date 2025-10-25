@@ -7,4 +7,6 @@ wandb/
 *.zip
 *.json
 ncp_data/
+ff_data/
+ff_rl_data/
 checkpoints/
