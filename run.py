@@ -560,10 +560,15 @@ def main():
                 #     ("\n".join(text_output.split("\n")[1:])).split("#")[0].strip()
                 # )
                 fake_output_after_batch = outputs[0][len(batch["input_ids"][0]):]
-                fake_output_after_batch = tokenizer.decode(fake_output_after_batch, skip_special_tokens=False)
-                print("fake_output_after_batch", fake_output_after_batch)
+                fake_output_after_batch_text = tokenizer.decode(fake_output_after_batch, skip_special_tokens=False)
+                print("fake_output_after_batch+text", fake_output_after_batch_text)
                 cot_output = text_output.split("\nassistant\n")[-1]
+                cot_output_tokenized = tokenizer.encode(cot_output)
                 print("cot_output", cot_output)
+                print(f"len((fake output tokens)): {len(fake_output_after_batch)}")
+                print(f"len((cot_output_tokenized)): {len(cot_output_tokenized)}")
+                redecoded = tokenizer.decode(cot_output_tokenized, skip_special_tokens=False)
+                print("redecoded", redecoded)
                 x = 1/0
 
                 # Conditionally use boxed answer extraction
