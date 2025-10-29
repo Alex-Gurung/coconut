@@ -560,7 +560,7 @@ def main():
                 #     ("\n".join(text_output.split("\n")[1:])).split("#")[0].strip()
                 # )
                 fake_output_after_batch = outputs[0][len(batch["input_ids"][0]):]
-                fake_output_after_batch = tokenizer.decode(fake_output_after_batch, skip_special_tokens=True)
+                fake_output_after_batch = tokenizer.decode(fake_output_after_batch, skip_special_tokens=False)
                 print("fake_output_after_batch", fake_output_after_batch)
                 cot_output = text_output.split("\nassistant\n")[-1]
                 print("cot_output", cot_output)
