@@ -556,9 +556,15 @@ def main():
                 default_extracted_answer = (
                     text_output.split("#")[-1].replace(",", "").strip()
                 )
-                cot_output = (
-                    ("\n".join(text_output.split("\n")[1:])).split("#")[0].strip()
-                )
+                # cot_output = (
+                #     ("\n".join(text_output.split("\n")[1:])).split("#")[0].strip()
+                # )
+                fake_output_after_batch = outputs[0][len(batch["input_ids"][0]):]
+                fake_output_after_batch = tokenizer.decode(fake_output_after_batch, skip_special_tokens=True)
+                print("fake_output_after_batch", fake_output_after_batch)
+                cot_output = text_output.split("\nassistant\n")[-1]
+                print("cot_output", cot_output)
+                x = 1/0
 
                 # Conditionally use boxed answer extraction
                 use_boxed = getattr(configs, "use_boxed_answer", True)
@@ -593,8 +599,6 @@ def main():
                     "answer_correct": ans_correct,
                     "cot_match": cot_output == answer_cot,
                 })
-                print(eval_outputs[-1])
-                x = 1/0
 
                 if idx < 5 and rank == 0:
                    # print some examples
