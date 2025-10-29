@@ -593,6 +593,8 @@ def main():
                     "answer_correct": ans_correct,
                     "cot_match": cot_output == answer_cot,
                 })
+                print(eval_outputs[-1])
+                x = 1/0
 
                 if idx < 5 and rank == 0:
                    # print some examples
