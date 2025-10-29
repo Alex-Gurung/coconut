@@ -523,6 +523,8 @@ def main():
             torch.tensor(0, device=rank),
             torch.tensor(0, device=rank),
         )
+        # Track total generated CoT tokens to report an average at the end
+        cot_token_sum = torch.tensor(0, device=rank, dtype=torch.long)
 
         # UNCOMMENT TO EVALUATE
         with torch.no_grad():
@@ -561,15 +563,17 @@ def main():
                 # )
                 fake_output_after_batch = outputs[0][len(batch["input_ids"][0]):]
                 fake_output_after_batch_text = tokenizer.decode(fake_output_after_batch, skip_special_tokens=False)
-                print("fake_output_after_batch+text", fake_output_after_batch_text)
+                # print("fake_output_after_batch+text", fake_output_after_batch_text)
                 cot_output = text_output.split("\nassistant\n")[-1]
                 cot_output_tokenized = tokenizer.encode(cot_output)
-                print("cot_output", cot_output)
-                print(f"len((fake output tokens)): {len(fake_output_after_batch)}")
-                print(f"len((cot_output_tokenized)): {len(cot_output_tokenized)}")
-                redecoded = tokenizer.decode(cot_output_tokenized, skip_special_tokens=False)
-                print("redecoded", redecoded)
-                x = 1/0
+                # Accumulate the number of generated CoT tokens
+                cot_token_sum += len(cot_output_tokenized)
+                # print("cot_output", cot_output)
+                # print(f"len((fake output tokens)): {len(fake_output_after_batch)}")
+                # print(f"len((cot_output_tokenized)): {len(cot_output_tokenized)}")
+                # redecoded = tokenizer.decode(cot_output_tokenized, skip_special_tokens=False)
+                # print("redecoded", redecoded)
+                # x = 1/0
 
                 # Conditionally use boxed answer extraction
                 use_boxed = getattr(configs, "use_boxed_answer", True)
@@ -603,6 +607,7 @@ def main():
                     "extracted_cot": cot_output,
                     "answer_correct": ans_correct,
                     "cot_match": cot_output == answer_cot,
+                    "num_cot_tokens": len(cot_output_tokenized),
                 })
 
                 if idx < 5 and rank == 0:
@@ -634,15 +639,20 @@ def main():
         dist.all_reduce(cor_cot, op=dist.ReduceOp.SUM)
         dist.all_reduce(cor, op=dist.ReduceOp.SUM)
         dist.all_reduce(total, op=dist.ReduceOp.SUM)
+        dist.all_reduce(cot_token_sum, op=dist.ReduceOp.SUM)
 
         cor_cot = cor_cot.item()
         cor = cor.item()
         total = total.item()
+        cot_sum = cot_token_sum.item()
         if rank == 0:
             accuracy = cor / total if total > 0 else 0
             cot_match = cor_cot / total if total > 0 else 0
             print(f"Accuracy on validation set: {cor} / {total} = {accuracy}")
             print(f"CoT match on validation set: {cor_cot} / {total} = {cot_match}")
+            avg_cot_tokens = (cot_sum / total) if total > 0 else 0
+            # Final concise eval summary
+            print(f"Eval summary -> accuracy: {accuracy:.4f}, samples: {total}, avg_cot_tokens: {avg_cot_tokens:.2f}")
         sys.stdout.flush()
         if wandb_run:
             wandb_run.log({"eval/acc": accuracy, "eval/cot_em": cot_match})
