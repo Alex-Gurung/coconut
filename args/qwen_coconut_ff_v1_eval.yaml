@@ -26,13 +26,16 @@ save_only_improve: False
 uniform_prob: 0.0  # Proper curriculum learning
 
 model_id: Qwen/Qwen2.5-7B-Instruct
-load_model_path: checkpoints/qwen-coconut-ff-v1/checkpoint_14 # Start from scratch
+  # load_model_path: checkpoints/qwen-coconut-ff-v1/checkpoint_14 # Start from scratch
+load_model_path: checkpoints/qwen-coconut-ff-v1/checkpoint_9 # Start from scratch
 seed: 42
-resume: 14
+  # resume: 14
+resume: 10
 bf16: True
 
 train_path: ff_rl_data/train.json
-val_path: ff_rl_data/val.json
+  # val_path: ff_rl_data/val.json
+val_path: ff_rl_data/test.json
 
 reset_optimizer: True
 batch_size_training: 1  # Per GPU
