@@ -26,7 +26,7 @@ save_only_improve: False
 uniform_prob: 0.0  # Proper curriculum learning
 
 model_id: Qwen/Qwen2.5-7B-Instruct
-  load_model_path: checkpoints/qwen-coconut-ff-v1/checkpoint_14 # Start from scratch
+load_model_path: checkpoints/qwen-coconut-ff-v1/checkpoint_14 # Start from scratch
 # load_model_path: checkpoints/qwen-coconut-ff-v1/checkpoint_9 # Start from scratch
 seed: 42
   # resume: 14
