@@ -1,7 +1,8 @@
 # Coconut training - following ProntoQA pattern for long reasoning chains
 project: coconut
 save_path: /mnt/disk/coconut/checkpoints
-name: qwen-coconut-ff-v1
+# name: qwen-coconut-ff-v1
+name: qwen-coconut-ff-v2
 
 only_eval: False
   # use_ddp: False
@@ -19,7 +20,8 @@ use_boxed_answer: True
 # c_thought: 2  # 2 latent tokens per reasoning step
 c_thought: 1  # 2 latent tokens per reasoning step
 epochs_per_stage: 2  # 2 epochs at each compression level
-max_latent_stage: 5  # Compress up to 5 steps (out of ~12 total)
+# max_latent_stage: 5  # Compress up to 5 steps (out of ~12 total)
+max_latent_stage: 10  # Compress up to 5 steps (out of ~12 total)
 pad_latent_to_max: True
 
 save_only_improve: False
