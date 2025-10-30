@@ -178,28 +178,35 @@ def main():
             configs.load_model_path, map_location=torch.device(rank)
         )
 
-        if configs.coconut and not any(
-            [k.startswith("base_causallm") for k in saved_weights.keys()]
-        ):
-            # we are loading a base model into coconut model
-            # e.g., for GSM8k, we used a SFTed model to skip the stage 0
+        # Normalize potential wrapper prefixes, e.g., DDP adds 'module.'
+        if any(k.startswith("module.") for k in saved_weights.keys()):
+            saved_weights = {k[len("module."):]: v for k, v in saved_weights.items()}
+
+        # Some compilers/wrappers may add '_orig_mod.'
+        if any(k.startswith("_orig_mod.") for k in saved_weights.keys()):
+            saved_weights = {
+                k[len("_orig_mod."):]: v for k, v in saved_weights.items()
+            }
+
+        has_coconut_prefix = any(
+            k.startswith("base_causallm") for k in saved_weights.keys()
+        )
+
+        if configs.coconut and not has_coconut_prefix:
+            # Loading a base LM (e.g., SFT) checkpoint into coconut model.
+            # Safe to load into base model before wrapping.
             loaded = True
             print(model.load_state_dict(saved_weights, strict=False))
 
-        elif not configs.coconut and any(
-            [k.startswith("base_causallm") for k in saved_weights.keys()]
-        ):
+        elif not configs.coconut and has_coconut_prefix:
             raise ValueError("Cannot load coconut model weights into a causallm model")
 
-        elif configs.coconut and any(
-            [k.startswith("base_causallm") for k in saved_weights.keys()]
-        ):
-            # loading from preempted run
-            # will handle later
+        elif configs.coconut and has_coconut_prefix:
+            # Will load into Coconut wrapper after it's constructed below.
             pass
 
         else:
-            # resume or evaluate sft model
+            # Resume/evaluate base LM checkpoint
             loaded = True
             print(model.load_state_dict(saved_weights, strict=False))
 
@@ -225,6 +232,7 @@ def main():
         model = Coconut(model, latent_id, start_id, end_id, tokenizer.eos_token_id)
 
     if configs.load_model_path != "None" and not loaded:
+        # At this point, a Coconut-wrapped checkpoint should be loaded into the wrapper
         print(model.load_state_dict(saved_weights, strict=False))
 
     print(f"Running FSDP on rank = {rank}, world size = {world_size}")
