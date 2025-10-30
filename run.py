@@ -527,114 +527,114 @@ def main():
         cot_token_sum = torch.tensor(0, device=rank, dtype=torch.long)
 
         # UNCOMMENT TO EVALUATE
-        # with torch.no_grad():
-        #     parallel_model.module.eval()
-        #     for idx, batch in enumerate(valid_gen_dataloader):
-        #         test_idx = batch["idx"][0]
+        with torch.no_grad():
+            parallel_model.module.eval()
+            for idx, batch in enumerate(valid_gen_dataloader):
+                test_idx = batch["idx"][0]
 
-        #         batch = {
-        #             k: v.to(rank)
-        #             for k, v in batch.items()
-        #             if v != None and k not in ["idx", "position_ids"]
-        #         }
-        #         # https://github.com/huggingface/transformers/issues/32492
+                batch = {
+                    k: v.to(rank)
+                    for k, v in batch.items()
+                    if v != None and k not in ["idx", "position_ids"]
+                }
+                # https://github.com/huggingface/transformers/issues/32492
 
-        #         assert len(batch["input_ids"]) == 1
-        #         answer = answers_val[test_idx.cpu().item()]
-        #         answer_cot = cot_val[test_idx.cpu().item()]
-        #         question = question_val[test_idx.cpu().item()]
+                assert len(batch["input_ids"]) == 1
+                answer = answers_val[test_idx.cpu().item()]
+                answer_cot = cot_val[test_idx.cpu().item()]
+                question = question_val[test_idx.cpu().item()]
 
-        #         total += 1
+                total += 1
 
-        #         # synced_gpus=True in FSDP mode, as we need to keep # forward pass the same on each device
-        #         outputs = parallel_model.module.generate(
-        #             **batch,
-        #             max_new_tokens=max_new_tokens,
-        #             synced_gpus=not configs.only_eval,
-        #         )
+                # synced_gpus=True in FSDP mode, as we need to keep # forward pass the same on each device
+                outputs = parallel_model.module.generate(
+                    **batch,
+                    max_new_tokens=max_new_tokens,
+                    synced_gpus=not configs.only_eval,
+                )
 
-        #         text_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        #         # Default extraction (legacy): take text after last '#'
-        #         default_extracted_answer = (
-        #             text_output.split("#")[-1].replace(",", "").strip()
-        #         )
-        #         # cot_output = (
-        #         #     ("\n".join(text_output.split("\n")[1:])).split("#")[0].strip()
-        #         # )
-        #         fake_output_after_batch = outputs[0][len(batch["input_ids"][0]):]
-        #         fake_output_after_batch_text = tokenizer.decode(fake_output_after_batch, skip_special_tokens=False)
-        #         # print("fake_output_after_batch+text", fake_output_after_batch_text)
-        #         cot_output = text_output.split("\nassistant\n")[-1]
-        #         cot_output_tokenized = tokenizer.encode(cot_output)
-        #         # Accumulate the number of generated CoT tokens
-        #         cot_token_sum += len(cot_output_tokenized)
-        #         # print("cot_output", cot_output)
-        #         # print(f"len((fake output tokens)): {len(fake_output_after_batch)}")
-        #         # print(f"len((cot_output_tokenized)): {len(cot_output_tokenized)}")
-        #         # redecoded = tokenizer.decode(cot_output_tokenized, skip_special_tokens=False)
-        #         # print("redecoded", redecoded)
-        #         # x = 1/0
+                text_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
+                # Default extraction (legacy): take text after last '#'
+                default_extracted_answer = (
+                    text_output.split("#")[-1].replace(",", "").strip()
+                )
+                # cot_output = (
+                #     ("\n".join(text_output.split("\n")[1:])).split("#")[0].strip()
+                # )
+                fake_output_after_batch = outputs[0][len(batch["input_ids"][0]):]
+                fake_output_after_batch_text = tokenizer.decode(fake_output_after_batch, skip_special_tokens=False)
+                # print("fake_output_after_batch+text", fake_output_after_batch_text)
+                cot_output = text_output.split("\nassistant\n")[-1]
+                cot_output_tokenized = tokenizer.encode(cot_output)
+                # Accumulate the number of generated CoT tokens
+                cot_token_sum += len(cot_output_tokenized)
+                # print("cot_output", cot_output)
+                # print(f"len((fake output tokens)): {len(fake_output_after_batch)}")
+                # print(f"len((cot_output_tokenized)): {len(cot_output_tokenized)}")
+                # redecoded = tokenizer.decode(cot_output_tokenized, skip_special_tokens=False)
+                # print("redecoded", redecoded)
+                # x = 1/0
 
-        #         # Conditionally use boxed answer extraction
-        #         use_boxed = getattr(configs, "use_boxed_answer", True)
-        #         boxed_extracted = extract_last_boxed(text_output) if use_boxed else None
-        #         answer_output = boxed_extracted if boxed_extracted else default_extracted_answer
+                # Conditionally use boxed answer extraction
+                use_boxed = getattr(configs, "use_boxed_answer", True)
+                boxed_extracted = extract_last_boxed(text_output) if use_boxed else None
+                answer_output = boxed_extracted if boxed_extracted else default_extracted_answer
 
-        #         # Determine correctness
-        #         if use_boxed:
-        #             # Compare as integers when using boxed answers, with robust fallbacks
-        #             pred_int = safe_int_from_text(answer_output)
-        #             if pred_int is None:
-        #                 # Fall back to yes/no style parsing -> numeric
-        #                 pred_int = int(parse_prediction(text_output))
+                # Determine correctness
+                if use_boxed:
+                    # Compare as integers when using boxed answers, with robust fallbacks
+                    pred_int = safe_int_from_text(answer_output)
+                    if pred_int is None:
+                        # Fall back to yes/no style parsing -> numeric
+                        pred_int = int(parse_prediction(text_output))
 
-        #             gt_int = safe_int_from_text(answer)
-        #             if gt_int is None:
-        #                 gt_int = int(parse_prediction(answer))
+                    gt_int = safe_int_from_text(answer)
+                    if gt_int is None:
+                        gt_int = int(parse_prediction(answer))
 
-        #             ans_correct = (pred_int is not None) and (gt_int is not None) and (pred_int == gt_int)
-        #         else:
-        #             ans_correct = answer_output == answer
+                    ans_correct = (pred_int is not None) and (gt_int is not None) and (pred_int == gt_int)
+                else:
+                    ans_correct = answer_output == answer
 
-        #         eval_outputs.append({
-        #             "idx": test_idx.cpu().item(),
-        #             "question": question,
-        #             "ground_truth_answer": answer,
-        #             "ground_truth_cot": answer_cot,
-        #             "generated_output": text_output,
-        #             "extracted_answer": answer_output,
-        #             "boxed_extracted_answer": boxed_extracted,
-        #             "extracted_cot": cot_output,
-        #             "answer_correct": ans_correct,
-        #             "cot_match": cot_output == answer_cot,
-        #             "num_cot_tokens": len(cot_output_tokenized),
-        #         })
+                eval_outputs.append({
+                    "idx": test_idx.cpu().item(),
+                    "question": question,
+                    "ground_truth_answer": answer,
+                    "ground_truth_cot": answer_cot,
+                    "generated_output": text_output,
+                    "extracted_answer": answer_output,
+                    "boxed_extracted_answer": boxed_extracted,
+                    "extracted_cot": cot_output,
+                    "answer_correct": ans_correct,
+                    "cot_match": cot_output == answer_cot,
+                    "num_cot_tokens": len(cot_output_tokenized),
+                })
 
-        #         if idx < 5 and rank == 0:
-        #            # print some examples
-        #            print(
-        #                f"Question {test_idx}: Answer = '{answer}' CoT = '{answer_cot}'"
-        #            )
-        #            print(f"Full output: '{tokenizer.decode(outputs[0])}'")
-        #            print(f"Extracted Output: '{answer_output}'")
-        #         if idx < 5 and rank == 0:
-        #             # print some examples
-        #             print(
-        #                 f"Question {test_idx}: Answer = '{answer}' CoT = '{answer_cot}'"
-        #             )
-        #             print(f"Full output: '{tokenizer.decode(outputs[0])}'")
-        #             print(f"Extracted Output: '{answer_output}'")
+                if idx < 5 and rank == 0:
+                   # print some examples
+                   print(
+                       f"Question {test_idx}: Answer = '{answer}' CoT = '{answer_cot}'"
+                   )
+                   print(f"Full output: '{tokenizer.decode(outputs[0])}'")
+                   print(f"Extracted Output: '{answer_output}'")
+                if idx < 5 and rank == 0:
+                    # print some examples
+                    print(
+                        f"Question {test_idx}: Answer = '{answer}' CoT = '{answer_cot}'"
+                    )
+                    print(f"Full output: '{tokenizer.decode(outputs[0])}'")
+                    print(f"Extracted Output: '{answer_output}'")
 
-        #         cor += 1 if ans_correct else 0
-        #         cor_cot += cot_output == answer_cot
+                cor += 1 if ans_correct else 0
+                cor_cot += cot_output == answer_cot
 
-        #         pbar.update(1)
-        #         pbar.set_description(
-        #             f"Test accuracy: {round(float(cor.detach().float() / total.detach().float()), 2)}"
-        #         )
+                pbar.update(1)
+                pbar.set_description(
+                    f"Test accuracy: {round(float(cor.detach().float() / total.detach().float()), 2)}"
+                )
 
-        #     pbar.close()
-        #     print(f"Device {rank}: Cor={cor}, CoT={cor_cot}, Total={total}")
+            pbar.close()
+            print(f"Device {rank}: Cor={cor}, CoT={cor_cot}, Total={total}")
 
         dist.all_reduce(cor_cot, op=dist.ReduceOp.SUM)
         dist.all_reduce(cor, op=dist.ReduceOp.SUM)
