@@ -555,10 +555,24 @@ def main():
                 total += 1
 
                 # synced_gpus=True in FSDP mode, as we need to keep # forward pass the same on each device
+                # Build generation kwargs with sampling parameters if enabled in config
+                gen_kwargs = {
+                    "max_new_tokens": max_new_tokens,
+                    "synced_gpus": not configs.only_eval,
+                }
+
+                # Add sampling parameters if enabled (useful for stochastic evaluation)
+                if getattr(configs, 'eval_do_sample', False):
+                    gen_kwargs.update({
+                        "do_sample": True,
+                        "temperature": getattr(configs, 'eval_temperature', 0.7),
+                        "top_p": getattr(configs, 'eval_top_p', 0.8),
+                        "top_k": getattr(configs, 'eval_top_k', None),
+                    })
+
                 outputs = parallel_model.module.generate(
                     **batch,
-                    max_new_tokens=max_new_tokens,
-                    synced_gpus=not configs.only_eval,
+                    **gen_kwargs,
                 )
 
                 text_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
