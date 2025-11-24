@@ -121,85 +121,61 @@ def combine_and_analyze_evals(eval_dir: str, output_path: str = "combined_eval.j
     # Compute overall statistics using all responses
     overall_accuracy = correct_count / len(all_responses) if len(all_responses) > 0 else 0
 
-    # Compute SEM based on repetition variance
-    # (since we sample the entire test set R times with different random seeds)
-    #
-    # SEM measures: "If we run this evaluation again, how much variation should we expect?"
-    # We compute per-repetition accuracy (accuracy in each eval run), then SEM across runs.
-    #
-    # For each unique question, compute its accuracy across the K repetitions.
-    # Then compute the mean accuracy per repetition.
+    # Run-level SEM: compute mean per run (eval file), then SEM across runs
+    # This measures uncertainty due to model stochasticity
+    n_runs = len(eval_files)
+    n_questions = len(responses_by_question)
 
-    # Get per-repetition accuracies
-    repetition_to_accuracies = defaultdict(list)
-    for i, eval_file in enumerate(eval_files):
-        # For repetition i, get all responses and compute overall accuracy
-        # We need to track which rep each response came from
-        pass
+    # Compute accuracy and token mean for each run
+    acc_per_run = []
+    tok_per_run = []
 
-    # Actually, we need to reorganize: for each eval file, compute its overall accuracy
-    # Load eval files again to compute per-file accuracy
-    per_rep_accuracies = []
     for eval_file in eval_files:
         with open(eval_file) as f:
             data = json.load(f)
-            # Compute accuracy for this repetition
+            # Accuracy for this run
             correct = sum(1 for o in data["outputs"]
                          if (o.get("answer_correct") if o.get("answer_correct") is not None
                              else str(o.get("extracted_answer", "")) == str(o.get("ground_truth_answer"))))
-            acc = correct / len(data["outputs"]) if data["outputs"] else 0
-            per_rep_accuracies.append(acc)
+            run_acc = correct / len(data["outputs"]) if data["outputs"] else 0
+            acc_per_run.append(run_acc)
 
-    # Compute SEM from repetition accuracies
-    mean_accuracy = np.mean(per_rep_accuracies) if per_rep_accuracies else 0
-    if len(per_rep_accuracies) > 1:
-        rep_accuracy_std = np.std(per_rep_accuracies, ddof=1)  # Sample std
-        rep_accuracy_sem = stats.sem(per_rep_accuracies)  # SEM using scipy
-    else:
-        rep_accuracy_std = 0
-        rep_accuracy_sem = 0
+            # Mean tokens for this run
+            tokens = [o.get("num_cot_tokens", 0) if o.get("num_cot_tokens", 0) > 0
+                     else len(o.get("generated_output", "").split()) for o in data["outputs"]]
+            run_tok = np.mean(tokens) if tokens else 0
+            tok_per_run.append(run_tok)
 
-    # For token lengths: compute per-run mean, then SEM across runs
-    # (same logic as accuracy - we want SEM of the mean estimate)
-    per_rep_token_lengths = []
-    for eval_file in eval_files:
-        with open(eval_file) as f:
-            data = json.load(f)
-            tokens_this_rep = [o.get("num_cot_tokens", 0) for o in data["outputs"]]
-            avg_tokens_this_rep = np.mean(tokens_this_rep) if tokens_this_rep else 0
-            per_rep_token_lengths.append(avg_tokens_this_rep)
+    # Compute mean and SEM using run-level approach
+    mean_accuracy = np.mean(acc_per_run) if acc_per_run else 0
+    accuracy_sem = np.std(acc_per_run, ddof=1) / np.sqrt(n_runs) if n_runs > 1 else 0
 
-    overall_avg_tokens = np.mean(per_rep_token_lengths) if per_rep_token_lengths else 0
-    if len(per_rep_token_lengths) > 1:
-        tokens_std = np.std(per_rep_token_lengths, ddof=1)  # Std of per-run means
-        tokens_sem = stats.sem(per_rep_token_lengths)  # SEM of per-run means
-    else:
-        tokens_std = 0
-        tokens_sem = 0
+    overall_avg_tokens = np.mean(tok_per_run) if tok_per_run else 0
+    tokens_sem = np.std(tok_per_run, ddof=1) / np.sqrt(n_runs) if n_runs > 1 else 0
 
     # Build combined output
     combined_data = {
         "config": first_config,
         "checkpoint": first_checkpoint,
-        "num_eval_runs": len(eval_files),
-        "num_unique_questions": len(responses_by_question),
+        "num_eval_runs": n_runs,
+        "num_unique_questions": n_questions,
         "total_responses": len(all_responses),
-        "overall_statistics": {
-            "accuracy": float(overall_accuracy),
-            "correct_count": correct_count,
-            "total_samples": len(all_responses),
+        "run_level_statistics": {
+            "mean_accuracy": float(mean_accuracy),
+            "sem_accuracy": float(accuracy_sem),
             "mean_token_length": float(overall_avg_tokens),
-            "std_token_length": float(tokens_std),
             "sem_token_length": float(tokens_sem),
+            "95_ci_accuracy": [
+                float(max(0, mean_accuracy - 1.96 * accuracy_sem)),
+                float(min(1, mean_accuracy + 1.96 * accuracy_sem))
+            ],
             "95_ci_token_length": [
                 float(overall_avg_tokens - 1.96 * tokens_sem),
                 float(overall_avg_tokens + 1.96 * tokens_sem)
             ],
-        },
-        "repetition_statistics": {
-            "mean_accuracy": float(mean_accuracy),
-            "std_accuracy": float(rep_accuracy_std),
-            "sem_accuracy": float(rep_accuracy_sem),
+            "n_questions": n_questions,
+            "n_runs": n_runs,
+            "methodology_note": "SEM = std(run_means) / sqrt(R), measures uncertainty due to model stochasticity"
         },
         "per_question_metrics": question_metrics
     }
@@ -209,14 +185,15 @@ def combine_and_analyze_evals(eval_dir: str, output_path: str = "combined_eval.j
         json.dump(combined_data, f, indent=2)
 
     print(f"\nCombined eval saved to {output_path}")
-    print(f"\n=== Repetition-Based Statistics ===")
-    print(f"Mean Accuracy across {len(eval_files)} runs: {mean_accuracy:.4f} ± {rep_accuracy_sem:.4f}")
-    print(f"  (Std dev: {rep_accuracy_std:.4f})")
-    print(f"\n=== Token Usage ===")
-    print(f"Mean Token Length: {overall_avg_tokens:.1f} ± {tokens_sem:.1f}")
+    print(f"\n=== Run-Level Statistics ===")
+    print(f"Mean Accuracy: {mean_accuracy:.4f} ± {accuracy_sem:.4f} (SEM)")
+    print(f"Mean Tokens: {overall_avg_tokens:.1f} ± {tokens_sem:.1f} (SEM)")
+    print(f"  N questions: {n_questions}, R runs: {n_runs}")
+    print(f"  SEM = std(run_means) / sqrt({n_runs})")
+    print(f"  (measures uncertainty due to model stochasticity)")
     print(f"\n=== Summary ===")
-    print(f"Evaluation runs: {len(eval_files)}")
-    print(f"Questions per run: {len(responses_by_question)}")
+    print(f"Evaluation runs: {n_runs}")
+    print(f"Questions: {n_questions}")
     print(f"Total responses: {len(all_responses)}")
 
     return combined_data

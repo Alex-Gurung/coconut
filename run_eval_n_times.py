@@ -8,6 +8,7 @@ Usage:
 Example:
     python run_eval_n_times.py checkpoints/qwen-coconut-ff-v2/checkpoint_13 5
     python run_eval_n_times.py Qwen/Qwen2.5-7B-Instruct 3 --config-base args/qwen_coconut_ff_v1_eval.yaml
+    python run_eval_n_times.py checkpoints/qwen-coconut-ff-v2/checkpoint_14 10 --config-base args/qwen_coconut_ff_v1_eval.yaml --name checkpoints/qwen-coconut-ff-v2/ff_check14
 """
 
 import argparse
