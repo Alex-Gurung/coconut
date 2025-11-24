@@ -1,0 +1,49 @@
+# Coconut evaluation derived from qwen_coconut_train_v3.yml
+project: coconut
+save_path: /mnt/disk/coconut/checkpoints
+name: qwen-coconut-v4-eval
+
+only_eval: True
+use_ddp: False
+torch_compile: False
+
+coconut: True
+cot: False
+no_thoughts: False
+no_cot: False
+use_chat_template: True
+use_boxed_answer: False
+
+# Curriculum settings (unused during eval but kept for compatibility)
+c_thought: 1
+epochs_per_stage: 2
+max_latent_stage: 5
+pad_latent_to_max: True
+
+save_only_improve: False
+uniform_prob: 0.0
+
+model_id: Qwen/Qwen2.5-7B-Instruct
+load_model_path: "/mnt/disk/coconut/checkpoints/qwen-coconut-v4/checkpoint_10"
+seed: 42
+resume: 10
+bf16: True
+
+train_path: new_ncp_rl_data/train.json
+val_path: new_ncp_rl_data/val.json
+
+reset_optimizer: True
+batch_size_training: 1
+debug: False
+gradient_accumulation_steps: 64
+num_epochs: 14
+lr: !!float "5e-5"
+weight_decay: 0.01
+
+# Evaluation sampling parameters - enables stochastic generation for uncertainty estimation
+eval_do_sample: True  # Enable sampling during evaluation
+eval_max_new_tokens: 2048
+eval_temperature: 0.7
+eval_top_p: 0.8
+eval_top_k: null
+

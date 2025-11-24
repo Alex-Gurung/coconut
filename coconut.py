@@ -218,6 +218,48 @@ class Coconut(nn.Module):
     def eval(self):
         self.base_causallm.eval()
 
+    def _sample_token(self, logits, do_sample=False, temperature=0.7, top_p=0.8, top_k=None):
+        """
+        Sample a token from logits using either greedy decoding or sampling.
+
+        Args:
+            logits: The logits tensor of shape (vocab_size,)
+            do_sample: If False, use argmax (greedy). If True, use sampling.
+            temperature: Temperature for scaling logits (only used if do_sample=True)
+            top_p: Nucleus sampling parameter (only used if do_sample=True)
+            top_k: Top-k filtering parameter (only used if do_sample=True)
+
+        Returns:
+            The selected token ID
+        """
+        if not do_sample:
+            # Greedy decoding: always pick the highest probability token
+            return torch.argmax(logits).item()
+
+        # Sampling: use temperature and top-p/top-k filtering
+        logits = logits / temperature
+
+        # Apply top-k filtering if specified
+        if top_k is not None and top_k > 0:
+            indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
+            logits[indices_to_remove] = float('-inf')
+
+        # Apply top-p (nucleus) filtering
+        if top_p is not None and top_p < 1.0:
+            sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+            cumsum_probs = torch.cumsum(torch.softmax(sorted_logits, dim=-1), dim=-1)
+            sorted_indices_to_remove = cumsum_probs > top_p
+            # Keep at least one token
+            sorted_indices_to_remove[..., 0] = False
+            indices_to_remove = sorted_indices[sorted_indices_to_remove]
+            logits[indices_to_remove] = float('-inf')
+
+        # Sample from the filtered distribution
+        probs = torch.softmax(logits, dim=-1)
+        next_token = torch.multinomial(probs, num_samples=1).item()
+
+        return next_token
+
     def generate(
         self,
         input_ids,
@@ -225,6 +267,10 @@ class Coconut(nn.Module):
         max_new_tokens=16,
         output_embedding=False,
         synced_gpus=False,
+        do_sample=False,
+        temperature=0.7,
+        top_p=0.8,
+        top_k=None,
         **kwargs
     ):
 
@@ -246,7 +292,7 @@ class Coconut(nn.Module):
         inputs_embeds = outputs.inputs_embeds
 
         # get the first token using the current hidden state
-        next_token = torch.argmax(outputs.logits[0, -1]).item()
+        next_token = self._sample_token(outputs.logits[0, -1], do_sample, temperature, top_p, top_k)
         tokens.append(next_token)
         new_token_embed = self.embedding(
             torch.tensor(next_token, device=input_ids.device)
@@ -263,7 +309,7 @@ class Coconut(nn.Module):
             )
             past_key_values = outputs.past_key_values
             self.gen_forward_cnt += 1
-            next_token = torch.argmax(outputs.logits[0, -1]).item()
+            next_token = self._sample_token(outputs.logits[0, -1], do_sample, temperature, top_p, top_k)
             if next_token == self.eos_token_id:
                 break
             tokens.append(next_token)

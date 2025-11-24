@@ -28,9 +28,11 @@ save_only_improve: False
 uniform_prob: 0.0  # Proper curriculum learning
 
 model_id: Qwen/Qwen2.5-7B-Instruct
-load_model_path: None  # Start from scratch
+  # load_model_path: None  # Start from scratch
+load_model_path: "/mnt/disk/coconut/checkpoints/qwen-coconut-ff-v2/checkpoint_13" # Start from scratch
 seed: 42
-resume: 0
+  # resume: 0
+resume: 14
 bf16: True
 
 train_path: ff_data/train.json
