@@ -1,17 +1,19 @@
 # Data / artifacts
-unmasked_sft_data_qwen7B/
-data/
-ff_data/
-ff_rl_data/
-ncp_data/
-checkpoints/
-models/
-coconut_model_hf/
-extracted_hf_model/
+/unmasked_sft_data_qwen7B/
+/data/
+/ff_data/
+/ff_rl_data/
+/musr_data/
+/musr_rl_data/
+/ncp_data/
+/checkpoints/
+/models/
+/coconut_model_hf/
+/extracted_hf_model/
 
 # Experiment outputs
-wandb/
-tmp/
+/wandb/
+/tmp/
 *.log
 
 # Python / local tooling
