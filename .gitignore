@@ -1,13 +1,26 @@
+# Data / artifacts
 unmasked_sft_data_qwen7B/
-models/
-coconut_model_hf/
-__pycache__/
 data/
-.claude/
-wandb/
-*.zip
-*.json
-ncp_data/
 ff_data/
 ff_rl_data/
+ncp_data/
 checkpoints/
+models/
+coconut_model_hf/
+extracted_hf_model/
+
+# Experiment outputs
+wandb/
+tmp/
+*.log
+
+# Python / local tooling
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.venv/
+.claude/
+
+# Large or generated files
+*.zip
+*.json
