@@ -1,6 +1,6 @@
 """
 Edit FILES with the eval_outputs.json paths you want to concatenate, then run:
-    python combine_eval_outputs.py
+    python scripts/eval/combine_eval_outputs.py
 Writes a single dictionary with all outputs merged into one list.
 """
 

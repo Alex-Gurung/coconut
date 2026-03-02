@@ -8,7 +8,7 @@ for run in 0 1 2 3 4; do
         -e "s|resume: [0-9]*|resume: 4|" \
         args/qwen_coconut_ncpeval_v4.yml
    
-    torchrun --nnodes 1 --nproc_per_node 4 evalrun.py args/qwen_coconut_ncpeval_v4.yml 
+    torchrun --nnodes 1 --nproc_per_node 4 run.py args/qwen_coconut_ncpeval_v4.yml 
     
     mv checkpoints/qwen-coconut-v4/eval_outputs.json \
        checkpoints/qwen-coconut-v4/check4_test${run}_eval_outputs.json

@@ -1,0 +1,51 @@
+project: coconut
+save_path: /mnt/disk/coconut/checkpoints
+name: qwen3-ff-coconut-v1
+
+only_eval: True
+use_ddp: True
+torch_compile: False
+
+coconut: True
+cot: False
+no_thoughts: False
+no_cot: False
+use_chat_template: True
+use_boxed_answer: True
+max_new_tokens: 1024
+eval_do_sample: True
+eval_temperature: 0.7
+eval_top_p: 0.8
+
+c_thought: 1
+epochs_per_stage: 2
+max_latent_stage: 10
+pad_latent_to_max: True
+
+save_only_improve: False
+uniform_prob: 0.0
+
+model_id: Qwen/Qwen3-4B-Instruct-2507
+
+# Set this to the checkpoint you want to evaluate.
+load_model_path: /mnt/disk/coconut/checkpoints/qwen3-ff-coconut-v1/checkpoint_14
+
+seed: 42
+
+# Keep this in sync with checkpoint epoch to use the matching latent stage.
+resume: 14
+bf16: True
+
+latent_init_token: "<<"
+
+# val_path is the evaluation split in only_eval mode.
+train_path: ff_data/train.json
+val_path: ff_data/val.json
+
+reset_optimizer: True
+batch_size_training: 1
+debug: False
+gradient_accumulation_steps: 64
+num_epochs: 14
+lr: !!float "5e-5"
+weight_decay: 0.01

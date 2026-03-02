@@ -37,7 +37,9 @@ class Coconut(nn.Module):
         else:
             self.embedding = self.base_causallm.get_input_embeddings()
 
-    def forward(self, input_ids, attention_mask, labels, position_ids, **kwargs):
+    def forward(
+        self, input_ids, attention_mask, labels, position_ids, token_type_ids=None, **kwargs
+    ):
 
         logits = []
 
@@ -75,6 +77,13 @@ class Coconut(nn.Module):
                     position_ids=position_ids[
                         :, next_compute_range[0] : next_compute_range[1]
                     ],
+                    token_type_ids=(
+                        None
+                        if token_type_ids is None
+                        else token_type_ids[
+                            :, next_compute_range[0] : next_compute_range[1]
+                        ]
+                    ),
                     output_hidden_states=True,
                 )
                 hidden_states_offset = 0
@@ -82,20 +91,17 @@ class Coconut(nn.Module):
             else:
                 # extract kv cache to reuse
                 if isinstance(kv_cache, Cache):
-                    legacy_cache = kv_cache.to_legacy_cache()
+                    past_key_values = kv_cache
+                    past_key_values.crop(next_compute_range[0])
                 else:
                     legacy_cache = kv_cache
-
-                past_key_values = tuple(
-                    (
-                        k[:, :, : next_compute_range[0], :],
-                        v[:, :, : next_compute_range[0], :],
+                    past_key_values = tuple(
+                        (
+                            k[:, :, : next_compute_range[0], :],
+                            v[:, :, : next_compute_range[0], :],
+                        )
+                        for k, v in legacy_cache
                     )
-                    for k, v in legacy_cache
-                )
-
-                if isinstance(kv_cache, Cache):
-                    past_key_values = DynamicCache.from_legacy_cache(past_key_values)
 
                 outputs = self.base_causallm(
                     inputs_embeds=inputs_embeds[
@@ -105,6 +111,13 @@ class Coconut(nn.Module):
                     position_ids=position_ids[
                         :, next_compute_range[0] : next_compute_range[1]
                     ],
+                    token_type_ids=(
+                        None
+                        if token_type_ids is None
+                        else token_type_ids[
+                            :, next_compute_range[0] : next_compute_range[1]
+                        ]
+                    ),
                     past_key_values=past_key_values,
                     output_hidden_states=True,
                 )
@@ -154,8 +167,16 @@ class Coconut(nn.Module):
                 batch_idx, token_idx = idx_pair
 
                 # replace it with the preceding last hidden states
+                hidden_idx = token_idx - 1 - hidden_states_offset
+                if hidden_idx < 0 or hidden_idx >= hidden_states.shape[1]:
+                    raise RuntimeError(
+                        "Coconut cache/hidden-state indexing mismatch. "
+                        f"Requested hidden index {hidden_idx} but hidden state length is {hidden_states.shape[1]}. "
+                        "This usually indicates an incompatible transformers cache behavior for the current "
+                        "incremental KV-cache forward path."
+                    )
                 tensor_list[batch_idx][token_idx] = hidden_states[
-                    batch_idx, token_idx - 1 - hidden_states_offset, :
+                    batch_idx, hidden_idx, :
                 ]
 
             # assemble the new inputs_embeds
@@ -168,15 +189,8 @@ class Coconut(nn.Module):
 
         # final pass
         if kv_cache and isinstance(kv_cache, Cache):
-            legacy_cache = kv_cache.to_legacy_cache()
-            past_key_values = tuple(
-                (
-                    k[:, :, : next_compute_range[0], :],
-                    v[:, :, : next_compute_range[0], :],
-                )
-                for k, v in legacy_cache
-            )
-            past_key_values = DynamicCache.from_legacy_cache(past_key_values)
+            past_key_values = kv_cache
+            past_key_values.crop(next_compute_range[0])
         elif kv_cache:
             past_key_values = tuple(
                 (
@@ -194,6 +208,11 @@ class Coconut(nn.Module):
             ],
             attention_mask=attention_mask[:, : next_compute_range[1]],
             position_ids=position_ids[:, next_compute_range[0] : next_compute_range[1]],
+            token_type_ids=(
+                None
+                if token_type_ids is None
+                else token_type_ids[:, next_compute_range[0] : next_compute_range[1]]
+            ),
             past_key_values=past_key_values,
             output_hidden_states=True,
         )
@@ -288,6 +307,7 @@ class Coconut(nn.Module):
             torch.arange(
                 0, input_ids.shape[1], dtype=torch.long, device=input_ids.device
             ).reshape(1, -1),
+            token_type_ids=torch.zeros_like(input_ids, device=input_ids.device),
         )
         inputs_embeds = outputs.inputs_embeds
 
@@ -305,7 +325,12 @@ class Coconut(nn.Module):
             outputs = self.base_causallm(
                 inputs_embeds=new_inputs_embeds if past_key_values is None else new_token_embed,
                 past_key_values=past_key_values,
-                use_cache=True
+                use_cache=True,
+                token_type_ids=(
+                    torch.zeros_like(new_inputs_embeds[..., 0], dtype=torch.long)
+                    if past_key_values is None
+                    else torch.zeros_like(new_token_embed[..., 0], dtype=torch.long)
+                ),
             )
             past_key_values = outputs.past_key_values
             self.gen_forward_cnt += 1
@@ -323,7 +348,12 @@ class Coconut(nn.Module):
                 self.gen_forward_cnt < max_new_tokens + MAX_N_LATENT
             ):  # leave some room for latent tokens
                 self.gen_forward_cnt += 1
-                _ = self.base_causallm(inputs_embeds=new_inputs_embeds)
+                _ = self.base_causallm(
+                    inputs_embeds=new_inputs_embeds,
+                    token_type_ids=torch.zeros_like(
+                        new_inputs_embeds[..., 0], dtype=torch.long
+                    ),
+                )
 
         if output_embedding:
             # for analysis purpose

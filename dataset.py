@@ -17,6 +17,18 @@ from transformers.data.data_collator import pad_without_fast_tokenizer_warning
 
 def get_dataset(path, tokenizer, max_size=1000000000, use_chat_template=False):
 
+    def _chat_template_ids(messages, add_generation_prompt):
+        rendered = tokenizer.apply_chat_template(
+            messages,
+            tokenize=True,
+            add_generation_prompt=add_generation_prompt,
+        )
+        if hasattr(rendered, "get") and rendered.get("input_ids") is not None:
+            rendered = rendered.get("input_ids")
+        if hasattr(rendered, "tolist"):
+            rendered = rendered.tolist()
+        return list(rendered)
+
     def tokenize_sample(sample):
 
         if use_chat_template:
@@ -27,10 +39,8 @@ def get_dataset(path, tokenizer, max_size=1000000000, use_chat_template=False):
 
             user_message = {"role": "user", "content": sample["question"]}
 
-            question_tokenized = list(
-                tokenizer.apply_chat_template(
-                    [user_message], tokenize=True, add_generation_prompt=True
-                )
+            question_tokenized = _chat_template_ids(
+                [user_message], add_generation_prompt=True
             )
 
             assistant_content_parts = []
@@ -47,12 +57,9 @@ def get_dataset(path, tokenizer, max_size=1000000000, use_chat_template=False):
                 "content": assistant_content,
             }
 
-            full_tokens = list(
-                tokenizer.apply_chat_template(
-                    [user_message, assistant_message],
-                    tokenize=True,
-                    add_generation_prompt=False,
-                )
+            full_tokens = _chat_template_ids(
+                [user_message, assistant_message],
+                add_generation_prompt=False,
             )
 
             assistant_tokens = full_tokens[len(question_tokenized) :]
@@ -153,8 +160,8 @@ def get_dataset(path, tokenizer, max_size=1000000000, use_chat_template=False):
                 user_message,
                 {"role": "assistant", "content": assistant_content},
             ]
-            complete_tokenized = tokenizer.apply_chat_template(
-                conversation, tokenize=True, add_generation_prompt=False
+            complete_tokenized = _chat_template_ids(
+                conversation, add_generation_prompt=False
             ) + [tokenizer.eos_token_id]
         else:
             # complete = d["question"] + "\n" + "\n".join(d["steps"]) + "\n### " + d["answer"]
@@ -243,6 +250,8 @@ class MyCollator:
             pad_to_multiple_of=None,
             return_tensors=return_tensors,
         )
+        if "token_type_ids" not in batch:
+            batch["token_type_ids"] = torch.zeros_like(batch["input_ids"])
 
         labels = (
             [feature[label_name] for feature in features]
@@ -277,6 +286,12 @@ class MyCollator:
             batch["position_ids"] = torch.tensor(
                 batch["position_ids"], dtype=torch.int64
             )
+        if "token_type_ids" in batch:
+            if batch["token_type_ids"].shape != batch["input_ids"].shape:
+                raise ValueError(
+                    "token_type_ids shape does not match input_ids. "
+                    f"token_type_ids: {batch['token_type_ids'].shape}, input_ids: {batch['input_ids'].shape}."
+                )
 
         return batch
 

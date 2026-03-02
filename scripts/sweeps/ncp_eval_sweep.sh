@@ -1,4 +1,4 @@
-for CKPT in 6 7 8 9 11 12 13; do
+for CKPT in 1 2 3 4 5 6 7 8 9 11 12 13 14; do
 # for CKPT in 13; do
     # sed -i "s|load_model_path: \".*/checkpoint_[0-9]*\"|load_model_path: \"/mnt/disk/coconut/checkpoints/qwen-coconut-v4/checkpoint_${CKPT}\"|" args/qwen_coconut_ncpeval_v4.yml 
     sed -i \
@@ -6,7 +6,7 @@ for CKPT in 6 7 8 9 11 12 13; do
         -e "s|resume: [0-9]*|resume: ${CKPT}|" \
         args/qwen_coconut_ncpeval_v4.yml
 
-    torchrun --nnodes 1 --nproc_per_node 4 evalrun.py args/qwen_coconut_ncpeval_v4.yml 
+    torchrun --nnodes 1 --nproc_per_node 4 run.py args/qwen_coconut_ncpeval_v4.yml 
     
     mv checkpoints/qwen-coconut-v4/eval_outputs.json \
        checkpoints/qwen-coconut-v4/check${CKPT}_eval_outputs.json

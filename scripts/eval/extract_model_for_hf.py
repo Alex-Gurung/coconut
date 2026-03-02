@@ -35,9 +35,18 @@ def extract_coconut_model(checkpoint_path, output_dir, model_id="Qwen/Qwen2.5-7B
     
     # The checkpoint contains Coconut wrapper state_dict
     # We need to extract only the base_causallm weights
-    base_model_state = {}
-    
+    # First, strip common wrapper prefixes (module. from DDP/FSDP, _orig_mod. from compile)
+    stripped = {}
     for key, value in checkpoint.items():
+        k = key
+        if k.startswith("module."):
+            k = k[len("module."):]
+        if k.startswith("_orig_mod."):
+            k = k[len("_orig_mod."):]
+        stripped[k] = value
+
+    base_model_state = {}
+    for key, value in stripped.items():
         if key.startswith("base_causallm."):
             # Remove the "base_causallm." prefix to get the original model keys
             new_key = key[len("base_causallm."):]

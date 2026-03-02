@@ -2,31 +2,31 @@
 
 Two scripts for managing multiple evaluation runs and computing statistical metrics:
 
-## `run_eval_n_times.py`
+## `scripts/eval/run_eval_n_times.py`
 
 Run evaluation N times with different seeds for a checkpoint or HuggingFace model.
 
 ### Usage
 
 ```bash
-python run_eval_n_times.py <checkpoint_or_model_id> <num_runs> [options]
+python scripts/eval/run_eval_n_times.py <checkpoint_or_model_id> <num_runs> [options]
 ```
 
 ### Examples
 
 **Evaluate a local checkpoint 5 times:**
 ```bash
-python run_eval_n_times.py checkpoints/qwen-coconut-ff-v2/checkpoint_13 5
+python scripts/eval/run_eval_n_times.py checkpoints/qwen-coconut-ff-v2/checkpoint_13 5
 ```
 
 **Evaluate a HuggingFace model 3 times with custom config:**
 ```bash
-python run_eval_n_times.py Qwen/Qwen2.5-7B-Instruct 3 --config-base args/qwen_coconut_ff_v1_eval.yaml
+python scripts/eval/run_eval_n_times.py Qwen/Qwen2.5-7B-Instruct 3 --config-base args/qwen_coconut_ff_v1_eval.yaml
 ```
 
 **Evaluate with custom validation data:**
 ```bash
-python run_eval_n_times.py checkpoints/my-model 4 --val-path data/my_test.json --name my_eval
+python scripts/eval/run_eval_n_times.py checkpoints/my-model 4 --val-path data/my_test.json --name my_eval
 ```
 
 ### Options
@@ -45,26 +45,26 @@ Each run creates an `eval_outputs_v{i}.json` file in the checkpoint directory wi
 
 ---
 
-## `combine_evals.py`
+## `scripts/eval/combine_evals.py`
 
 Combine multiple eval outputs from different runs and compute SEM (Standard Error of the Mean) statistics.
 
 ### Usage
 
 ```bash
-python combine_evals.py <eval_dir> [--output output.json]
+python scripts/eval/combine_evals.py <eval_dir> [--output output.json]
 ```
 
 ### Examples
 
 **Combine all v*.json files from qwen-coconut-ff-v2:**
 ```bash
-python combine_evals.py checkpoints/qwen-coconut-ff-v2
+python scripts/eval/combine_evals.py checkpoints/qwen-coconut-ff-v2
 ```
 
 **Combine with custom output path:**
 ```bash
-python combine_evals.py checkpoints/qwen-coconut-ff-v2 --output results/combined_eval.json
+python scripts/eval/combine_evals.py checkpoints/qwen-coconut-ff-v2 --output results/combined_eval.json
 ```
 
 ### Output Format
@@ -133,10 +133,10 @@ The combined JSON file includes:
 
 ```bash
 # 1. Run evaluation 5 times with different seeds
-python run_eval_n_times.py checkpoints/qwen-coconut-ff-v2/checkpoint_13 5 --name my_model_eval
+python scripts/eval/run_eval_n_times.py checkpoints/qwen-coconut-ff-v2/checkpoint_13 5 --name my_model_eval
 
 # 2. Combine results and compute SEM metrics
-python combine_evals.py checkpoints/qwen-coconut-ff-v2 --output results/my_model_eval_combined.json
+python scripts/eval/combine_evals.py checkpoints/qwen-coconut-ff-v2 --output results/my_model_eval_combined.json
 
 # 3. View the results
 cat results/my_model_eval_combined.json | python -m json.tool

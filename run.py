@@ -48,6 +48,24 @@ from typing import Optional
 # Regex and helpers for extracting boxed answers from model outputs
 BOXED_RE = re.compile(r"\\boxed\{([^}]*)\}", re.IGNORECASE)
 
+OPTIONAL_CONFIG_DEFAULTS = {
+    "enable_gen_eval": False,
+    "eval_do_sample": False,
+    "eval_temperature": 0.7,
+    "eval_top_p": 0.8,
+    "eval_top_k": None,
+    "use_chat_template": False,
+    "use_boxed_answer": True,
+    "use_ddp": False,
+    "torch_compile": False,
+    "save_every": 1,
+    "latent_init_token": "<<",
+    "smoke_single_gpu": False,
+    "train_fraction": None,
+    "max_new_tokens": None,
+    "max_eval_samples": None,
+}
+
 
 def extract_last_boxed(text: str) -> Optional[str]:
     matches = list(BOXED_RE.finditer(text or ""))
@@ -89,6 +107,17 @@ def safe_int_from_text(text: str) -> Optional[int]:
     return None
 
 
+def _log_non_default_optional_config(config_dict: dict) -> None:
+    changed = {}
+    for key, default in OPTIONAL_CONFIG_DEFAULTS.items():
+        if key in config_dict and config_dict[key] != default:
+            changed[key] = config_dict[key]
+    if changed:
+        print("Non-default optional config values:")
+        for key in sorted(changed.keys()):
+            print(f"  {key}: {changed[key]!r} (default: {OPTIONAL_CONFIG_DEFAULTS[key]!r})")
+
+
 def main():
 
     parser = argparse.ArgumentParser(description="coconut")
@@ -108,10 +137,16 @@ def main():
 
     if rank == 0:
         print("Config:", config_dict)
+        _log_non_default_optional_config(config_dict)
 
     configs = Config(config_dict)
     set_seed(configs.seed)
     save_dir = os.path.join(configs.save_path, configs.name)
+    if getattr(configs, "smoke_single_gpu", False) and world_size != 1:
+        raise ValueError(
+            "Smoke config requires a single GPU. Re-run with "
+            "`torchrun --nproc_per_node 1` (or use a non-smoke config)."
+        )
 
     if not os.path.exists(save_dir) and rank == 0:
         os.makedirs(save_dir)
@@ -157,19 +192,39 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         configs.model_id,
         attn_implementation="flash_attention_2",
-        # attn_implementation="flash_attention_3",
         torch_dtype=torch.bfloat16 if configs.bf16 else torch.float16,
         device_map=None,  # We handle device placement manually
     )
     print("✓ Loaded model with Flash Attention 2")
     tokenizer = AutoTokenizer.from_pretrained(configs.model_id)
-    tokenizer.pad_token = tokenizer.eos_token
+    if tokenizer.eos_token is None:
+        raise ValueError(
+            "Tokenizer must define an eos_token for this training pipeline."
+        )
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    if tokenizer.padding_side != "right":
+        print(
+            f"WARNING: tokenizer.padding_side={tokenizer.padding_side!r}; "
+            "overriding to 'right' for Coconut collator."
+        )
+        tokenizer.padding_side = "right"
     tokenizer.add_tokens("<|start-latent|>")
     tokenizer.add_tokens("<|end-latent|>")
     tokenizer.add_tokens("<|latent|>")
     latent_id = tokenizer.convert_tokens_to_ids("<|latent|>")
     start_id = tokenizer.convert_tokens_to_ids("<|start-latent|>")
     end_id = tokenizer.convert_tokens_to_ids("<|end-latent|>")
+    unk_id = tokenizer.unk_token_id
+    for tok_name, tok_id in (
+        ("<|latent|>", latent_id),
+        ("<|start-latent|>", start_id),
+        ("<|end-latent|>", end_id),
+    ):
+        if tok_id is None or tok_id < 0 or (unk_id is not None and tok_id == unk_id):
+            raise ValueError(
+                f"Special token {tok_name} failed to register correctly in tokenizer."
+            )
 
     loaded = False
 
@@ -214,7 +269,16 @@ def main():
         # if we need new tokens, initialize their embeddings and lm heads
         model.resize_token_embeddings(len(tokenizer))
         embeddings = model.get_input_embeddings()
-        target_id = tokenizer.convert_tokens_to_ids("<<")
+        latent_init_token = getattr(configs, "latent_init_token", "<<")
+        target_id = tokenizer.convert_tokens_to_ids(latent_init_token)
+        if (
+            target_id is None
+            or target_id < 0
+            or (unk_id is not None and target_id == unk_id)
+        ):
+            raise ValueError(
+                f"Initialization token {latent_init_token!r} is not in the tokenizer vocabulary."
+            )
         # initialize the new token embeddings with a known token
         # it helps stablize the training
         for token_id in [latent_id, start_id, end_id]:
@@ -275,25 +339,54 @@ def main():
         d["answer"].replace(",", "").strip() for d in json.load(open(configs.val_path))
     ]
     cot_val = ["\n".join(d["steps"]) for d in json.load(open(configs.val_path))]
+    if not (len(question_val) == len(answers_val) == len(cot_val)):
+        raise ValueError(
+            "Validation file length mismatch between questions, answers, and steps. "
+            f"Got questions={len(question_val)}, answers={len(answers_val)}, steps={len(cot_val)}."
+        )
+    if len(question_val) == 0:
+        raise ValueError(
+            f"Validation file is empty: {configs.val_path}. "
+            "Refusing to train without validation data."
+        )
 
     use_chat_template = getattr(configs, "use_chat_template", False)
 
+    max_eval_size = getattr(configs, "max_eval_samples", None)
+    if max_eval_size is None:
+        max_eval_size = 32 if configs.debug else 100000000
     base_dataset_valid = get_dataset(
         configs.val_path,
         tokenizer,
-        max_size=32 if configs.debug else 100000000,
+        max_size=max_eval_size,
         use_chat_template=use_chat_template,
     )
+    if len(base_dataset_valid) == 0:
+        raise ValueError(
+            f"Tokenized validation dataset is empty: {configs.val_path}. "
+            "Refusing to train without validation data."
+        )
 
     if not configs.only_eval:
+        train_fraction = getattr(configs, "train_fraction", None)
+        if train_fraction is not None:
+            if not (0 < train_fraction <= 1.0):
+                raise ValueError(
+                    f"train_fraction must be in (0, 1], got {train_fraction}."
+                )
+        max_train_size = 5000 if configs.debug else 100000000
+        if train_fraction is not None:
+            max_train_size = max(1, int(max_train_size * float(train_fraction)))
         base_dataset_train = get_dataset(
             configs.train_path,
             tokenizer,
-            max_size=5000 if configs.debug else 100000000,
+            max_size=max_train_size,
             use_chat_template=use_chat_template,
         )
 
-    if "gsm" in configs.val_path:
+    if getattr(configs, "max_new_tokens", None) is not None:
+        max_new_tokens = configs.max_new_tokens
+    elif "gsm" in configs.val_path:
         max_new_tokens = 64
     else:
         max_new_tokens = 2048
@@ -391,6 +484,11 @@ def main():
                 end_id,
                 no_special_marker=configs.cot or configs.no_cot or configs.no_thoughts,
             )
+            if len(dataset_loss_val) == 0:
+                raise ValueError(
+                    f"Validation loss dataset is empty at epoch {epoch+1}. "
+                    "Check val data and preprocessing."
+                )
 
             valid_loss_dataloader = torch.utils.data.DataLoader(
                 dataset_loss_val,
@@ -484,17 +582,21 @@ def main():
                 and not configs.debug
                 and not configs.only_eval
             ):
-                states = parallel_model.state_dict()
-                if rank == 0:
-                    torch.save(
-                        states, os.path.join(save_dir, f"checkpoint_{epoch + 1}")
-                    )
-                    print("saving model.")
+                save_every = getattr(configs, "save_every", 1)
+                if save_every <= 0:
+                    raise ValueError(f"save_every must be >= 1, got {save_every}.")
+                if (epoch + 1) % save_every == 0:
+                    states = parallel_model.state_dict()
+                    if rank == 0:
+                        torch.save(
+                            states, os.path.join(save_dir, f"checkpoint_{epoch + 1}")
+                        )
+                        print("saving model.")
 
-                dist.barrier()
-                del states
-                gc.collect()
-                torch.cuda.empty_cache()
+                    dist.barrier()
+                    del states
+                    gc.collect()
+                    torch.cuda.empty_cache()
 
             # val loss
             total_loss = 0
@@ -520,186 +622,185 @@ def main():
                     wandb_run.log(log_dict)
                     print("eval loss", total_loss / len(valid_loss_dataloader))
 
-        # val generation accuracy
-        total_length = len(valid_gen_dataloader)
-
-        pbar = tqdm(
-            colour="blue", desc=f"Test Accuracy", total=total_length, dynamic_ncols=True
-        )
-        cor, cor_cot, total = (
-            torch.tensor(0, device=rank),
-            torch.tensor(0, device=rank),
-            torch.tensor(0, device=rank),
-        )
-        # Track total generated CoT tokens to report an average at the end
+        enable_gen_eval = getattr(configs, "enable_gen_eval", False)
+        cor = torch.tensor(0, device=rank)
+        cor_cot = torch.tensor(0, device=rank)
+        total = torch.tensor(0, device=rank)
         cot_token_sum = torch.tensor(0, device=rank, dtype=torch.long)
+        accuracy = 0.0
+        cot_match = 0.0
 
-        # UNCOMMENT TO EVALUATE
-        # with torch.no_grad():
-        #     parallel_model.module.eval()
-        #     for idx, batch in enumerate(valid_gen_dataloader):
-        #         test_idx = batch["idx"][0]
+        if enable_gen_eval:
+            total_length = len(valid_gen_dataloader)
+            pbar = tqdm(
+                colour="blue", desc=f"Test Accuracy", total=total_length, dynamic_ncols=True
+            )
+            with torch.no_grad():
+                parallel_model.module.eval()
+                for idx, batch in enumerate(valid_gen_dataloader):
+                    test_idx = batch["idx"][0]
 
-        #         batch = {
-        #             k: v.to(rank)
-        #             for k, v in batch.items()
-        #             if v != None and k not in ["idx", "position_ids"]
-        #         }
-        #         # https://github.com/huggingface/transformers/issues/32492
+                    batch = {
+                        k: v.to(rank)
+                        for k, v in batch.items()
+                        if v is not None and k not in ["idx", "position_ids"]
+                    }
 
-        #         assert len(batch["input_ids"]) == 1
-        #         answer = answers_val[test_idx.cpu().item()]
-        #         answer_cot = cot_val[test_idx.cpu().item()]
-        #         question = question_val[test_idx.cpu().item()]
+                    assert len(batch["input_ids"]) == 1
+                    answer = answers_val[test_idx.cpu().item()]
+                    answer_cot = cot_val[test_idx.cpu().item()]
+                    question = question_val[test_idx.cpu().item()]
 
-        #         total += 1
+                    total += 1
 
-        #         # synced_gpus=True in FSDP mode, as we need to keep # forward pass the same on each device
-        #         # Build generation kwargs with sampling parameters if enabled in config
-        #         gen_kwargs = {
-        #             "max_new_tokens": max_new_tokens,
-        #             "synced_gpus": not configs.only_eval,
-        #         }
+                    gen_kwargs = {
+                        "max_new_tokens": max_new_tokens,
+                        "synced_gpus": not configs.only_eval,
+                    }
+                    if getattr(configs, "eval_do_sample", False):
+                        gen_kwargs.update(
+                            {
+                                "do_sample": True,
+                                "temperature": getattr(configs, "eval_temperature", 0.7),
+                                "top_p": getattr(configs, "eval_top_p", 0.8),
+                                "top_k": getattr(configs, "eval_top_k", None),
+                            }
+                        )
 
-        #         # Add sampling parameters if enabled (useful for stochastic evaluation)
-        #         if getattr(configs, 'eval_do_sample', False):
-        #             gen_kwargs.update({
-        #                 "do_sample": True,
-        #                 "temperature": getattr(configs, 'eval_temperature', 0.7),
-        #                 "top_p": getattr(configs, 'eval_top_p', 0.8),
-        #                 "top_k": getattr(configs, 'eval_top_k', None),
-        #             })
+                    outputs = parallel_model.module.generate(
+                        **batch,
+                        **gen_kwargs,
+                    )
 
-        #         outputs = parallel_model.module.generate(
-        #             **batch,
-        #             **gen_kwargs,
-        #         )
+                    text_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
+                    default_extracted_answer = (
+                        text_output.split("#")[-1].replace(",", "").strip()
+                    )
+                    cot_output = text_output.split("\nassistant\n")[-1]
+                    cot_output_tokenized = tokenizer.encode(cot_output)
+                    cot_token_sum += len(cot_output_tokenized)
 
-        #         text_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        #         # Default extraction (legacy): take text after last '#'
-        #         default_extracted_answer = (
-        #             text_output.split("#")[-1].replace(",", "").strip()
-        #         )
-        #         # cot_output = (
-        #         #     ("\n".join(text_output.split("\n")[1:])).split("#")[0].strip()
-        #         # )
-        #         fake_output_after_batch = outputs[0][len(batch["input_ids"][0]):]
-        #         fake_output_after_batch_text = tokenizer.decode(fake_output_after_batch, skip_special_tokens=False)
-        #         # print("fake_output_after_batch+text", fake_output_after_batch_text)
-        #         cot_output = text_output.split("\nassistant\n")[-1]
-        #         cot_output_tokenized = tokenizer.encode(cot_output)
-        #         # Accumulate the number of generated CoT tokens
-        #         cot_token_sum += len(cot_output_tokenized)
-        #         # print("cot_output", cot_output)
-        #         # print(f"len((fake output tokens)): {len(fake_output_after_batch)}")
-        #         # print(f"len((cot_output_tokenized)): {len(cot_output_tokenized)}")
-        #         # redecoded = tokenizer.decode(cot_output_tokenized, skip_special_tokens=False)
-        #         # print("redecoded", redecoded)
-        #         # x = 1/0
+                    use_boxed = getattr(configs, "use_boxed_answer", True)
+                    boxed_extracted = (
+                        extract_last_boxed(text_output) if use_boxed else None
+                    )
+                    answer_output = (
+                        boxed_extracted if boxed_extracted else default_extracted_answer
+                    )
 
-        #         # Conditionally use boxed answer extraction
-        #         use_boxed = getattr(configs, "use_boxed_answer", True)
-        #         boxed_extracted = extract_last_boxed(text_output) if use_boxed else None
-        #         answer_output = boxed_extracted if boxed_extracted else default_extracted_answer
+                    if use_boxed:
+                        pred_int = safe_int_from_text(answer_output)
+                        if pred_int is None:
+                            pred_int = int(parse_prediction(text_output))
 
-        #         # Determine correctness
-        #         if use_boxed:
-        #             # Compare as integers when using boxed answers, with robust fallbacks
-        #             pred_int = safe_int_from_text(answer_output)
-        #             if pred_int is None:
-        #                 # Fall back to yes/no style parsing -> numeric
-        #                 pred_int = int(parse_prediction(text_output))
+                        gt_int = safe_int_from_text(answer)
+                        if gt_int is None:
+                            gt_int = int(parse_prediction(answer))
 
-        #             gt_int = safe_int_from_text(answer)
-        #             if gt_int is None:
-        #                 gt_int = int(parse_prediction(answer))
+                        ans_correct = (
+                            pred_int is not None
+                            and gt_int is not None
+                            and pred_int == gt_int
+                        )
+                    else:
+                        ans_correct = answer_output == answer
 
-        #             ans_correct = (pred_int is not None) and (gt_int is not None) and (pred_int == gt_int)
-        #         else:
-        #             ans_correct = answer_output == answer
+                    eval_outputs.append(
+                        {
+                            "idx": test_idx.cpu().item(),
+                            "question": question,
+                            "ground_truth_answer": answer,
+                            "ground_truth_cot": answer_cot,
+                            "generated_output": text_output,
+                            "extracted_answer": answer_output,
+                            "boxed_extracted_answer": boxed_extracted,
+                            "extracted_cot": cot_output,
+                            "answer_correct": ans_correct,
+                            "cot_match": cot_output == answer_cot,
+                            "num_cot_tokens": len(cot_output_tokenized),
+                        }
+                    )
 
-        #         eval_outputs.append({
-        #             "idx": test_idx.cpu().item(),
-        #             "question": question,
-        #             "ground_truth_answer": answer,
-        #             "ground_truth_cot": answer_cot,
-        #             "generated_output": text_output,
-        #             "extracted_answer": answer_output,
-        #             "boxed_extracted_answer": boxed_extracted,
-        #             "extracted_cot": cot_output,
-        #             "answer_correct": ans_correct,
-        #             "cot_match": cot_output == answer_cot,
-        #             "num_cot_tokens": len(cot_output_tokenized),
-        #         })
+                    if idx < 5 and rank == 0:
+                        print(
+                            f"Question {test_idx}: Answer = '{answer}' CoT = '{answer_cot}'"
+                        )
+                        print(f"Full output: '{tokenizer.decode(outputs[0])}'")
+                        print(f"Extracted Output: '{answer_output}'")
 
-        #         if idx < 5 and rank == 0:
-        #            # print some examples
-        #            print(
-        #                f"Question {test_idx}: Answer = '{answer}' CoT = '{answer_cot}'"
-        #            )
-        #            print(f"Full output: '{tokenizer.decode(outputs[0])}'")
-        #            print(f"Extracted Output: '{answer_output}'")
-        #         if idx < 5 and rank == 0:
-        #             # print some examples
-        #             print(
-        #                 f"Question {test_idx}: Answer = '{answer}' CoT = '{answer_cot}'"
-        #             )
-        #             print(f"Full output: '{tokenizer.decode(outputs[0])}'")
-        #             print(f"Extracted Output: '{answer_output}'")
+                    cor += 1 if ans_correct else 0
+                    cor_cot += cot_output == answer_cot
 
-        #         cor += 1 if ans_correct else 0
-        #         cor_cot += cot_output == answer_cot
+                    pbar.update(1)
+                    pbar.set_description(
+                        f"Test accuracy: {round(float(cor.detach().float() / total.detach().float()), 2)}"
+                    )
 
-        #         pbar.update(1)
-        #         pbar.set_description(
-        #             f"Test accuracy: {round(float(cor.detach().float() / total.detach().float()), 2)}"
-        #         )
+                pbar.close()
+                print(f"Device {rank}: Cor={cor}, CoT={cor_cot}, Total={total}")
 
-        #     pbar.close()
-        #     print(f"Device {rank}: Cor={cor}, CoT={cor_cot}, Total={total}")
+            dist.all_reduce(cor_cot, op=dist.ReduceOp.SUM)
+            dist.all_reduce(cor, op=dist.ReduceOp.SUM)
+            dist.all_reduce(total, op=dist.ReduceOp.SUM)
+            dist.all_reduce(cot_token_sum, op=dist.ReduceOp.SUM)
 
-        dist.all_reduce(cor_cot, op=dist.ReduceOp.SUM)
-        dist.all_reduce(cor, op=dist.ReduceOp.SUM)
-        dist.all_reduce(total, op=dist.ReduceOp.SUM)
-        dist.all_reduce(cot_token_sum, op=dist.ReduceOp.SUM)
-
-        cor_cot = cor_cot.item()
-        cor = cor.item()
-        total = total.item()
-        cot_sum = cot_token_sum.item()
-        if rank == 0:
-            accuracy = cor / total if total > 0 else 0
-            cot_match = cor_cot / total if total > 0 else 0
-            print(f"Accuracy on validation set: {cor} / {total} = {accuracy}")
-            print(f"CoT match on validation set: {cor_cot} / {total} = {cot_match}")
-            avg_cot_tokens = (cot_sum / total) if total > 0 else 0
-            # Final concise eval summary
-            print(f"Eval summary -> accuracy: {accuracy:.4f}, samples: {total}, avg_cot_tokens: {avg_cot_tokens:.2f}")
-        sys.stdout.flush()
-        if wandb_run:
-            wandb_run.log({"eval/acc": accuracy, "eval/cot_em": cot_match})
+            cor_cot = cor_cot.item()
+            cor = cor.item()
+            total = total.item()
+            cot_sum = cot_token_sum.item()
+            if rank == 0:
+                accuracy = cor / total if total > 0 else 0
+                cot_match = cor_cot / total if total > 0 else 0
+                print(f"Accuracy on validation set: {cor} / {total} = {accuracy}")
+                print(f"CoT match on validation set: {cor_cot} / {total} = {cot_match}")
+                avg_cot_tokens = (cot_sum / total) if total > 0 else 0
+                # Final concise eval summary
+                print(f"Eval summary -> accuracy: {accuracy:.4f}, samples: {total}, avg_cot_tokens: {avg_cot_tokens:.2f}")
+            sys.stdout.flush()
+            if wandb_run:
+                wandb_run.log({"eval/acc": accuracy, "eval/cot_em": cot_match})
+        else:
+            cor = 0
+            cor_cot = 0
+            total = 0
+            if rank == 0:
+                print("Skipping generation eval (enable_gen_eval=False).")
 
         outputs_to_save = None
         if configs.only_eval:
             gathered_eval_outputs = [None for _ in range(world_size)]
             dist.all_gather_object(gathered_eval_outputs, eval_outputs)
             if rank == 0:
-                outputs_to_save = [
-                    entry for shard in gathered_eval_outputs for entry in shard
-                ]
+                seen_idxs = set()
+                deduped = []
+                for shard in gathered_eval_outputs:
+                    for entry in shard:
+                        if entry["idx"] not in seen_idxs:
+                            seen_idxs.add(entry["idx"])
+                            deduped.append(entry)
+                outputs_to_save = deduped
 
         # Save evaluation outputs to JSON file
         if configs.only_eval and rank == 0:
+            if outputs_to_save:
+                deduped_total = len(outputs_to_save)
+                deduped_cor = sum(1 for e in outputs_to_save if e["answer_correct"])
+                deduped_cot = sum(1 for e in outputs_to_save if e["cot_match"])
+            else:
+                deduped_total = total
+                deduped_cor = cor
+                deduped_cot = cor_cot
+
             output_file = os.path.join(save_dir, "eval_outputs.json")
             with open(output_file, "w") as f:
                 json.dump({
                     "config": config_dict,
                     "checkpoint": configs.load_model_path,
-                    "accuracy": cor / total if total > 0 else 0,
-                    "cot_exact_match": cor_cot / total if total > 0 else 0,
-                    "total_samples": total,
-                    "correct_answers": cor,
-                    "cot_matches": cor_cot,
+                    "accuracy": deduped_cor / deduped_total if deduped_total > 0 else 0,
+                    "cot_exact_match": deduped_cot / deduped_total if deduped_total > 0 else 0,
+                    "total_samples": deduped_total,
+                    "correct_answers": deduped_cor,
+                    "cot_matches": deduped_cot,
                     "outputs": outputs_to_save if outputs_to_save is not None else eval_outputs
                 }, f, indent=2)
             print(f"\n✓ Saved evaluation outputs to: {output_file}")

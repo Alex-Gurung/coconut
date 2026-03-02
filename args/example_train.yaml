@@ -1,0 +1,61 @@
+# Example training config (copy to args/my_train.yaml and edit)
+project: coconut
+save_path: /mnt/disk/coconut/checkpoints
+name: example-train
+
+# Core mode
+only_eval: false
+
+# Distributed/runtime
+use_ddp: true            # true = DDP, false = FSDP
+torch_compile: false     # keep false for first runs
+bf16: true
+
+# Model + checkpoint loading
+model_id: Qwen/Qwen3-4B-Instruct-2507
+load_model_path: "None"   # set checkpoint path to resume/finetune
+resume: 0
+latent_init_token: "<<"   # must exist in tokenizer vocab
+
+# Coconut behavior
+coconut: true
+cot: false
+no_thoughts: false
+no_cot: false
+c_thought: 1
+max_latent_stage: 10
+epochs_per_stage: 2
+pad_latent_to_max: true
+uniform_prob: 0.0
+
+# Data
+train_path: ff_data/train.json
+val_path: ff_data/val.json
+use_chat_template: true
+
+# Training
+seed: 42
+batch_size_training: 1
+gradient_accumulation_steps: 64
+num_epochs: 14
+lr: !!float "5e-5"
+weight_decay: 0.01
+reset_optimizer: true
+save_only_improve: false
+save_every: 1
+
+# Evaluation during training
+enable_gen_eval: false   # keep false for faster training; set true when needed
+use_boxed_answer: true
+max_new_tokens: 1024
+
+# Optional generation sampling (used only if enable_gen_eval=true)
+eval_do_sample: false
+eval_temperature: 0.7
+eval_top_p: 0.8
+eval_top_k: null
+
+# Debug/smoke
+debug: false
+smoke_single_gpu: false
+train_fraction: null
