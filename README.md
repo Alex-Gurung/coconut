@@ -42,7 +42,7 @@ cp args/example_eval.yaml args/my_eval.yaml
 
 Run eval:
 ```bash
-torchrun --nnodes 1 --nproc_per_node 1 evalrun.py args/my_eval.yaml
+torchrun --nnodes 1 --nproc_per_node 1 run.py args/my_eval.yaml
 ```
 
 ## Project Layout
@@ -64,3 +64,6 @@ Combine eval outputs:
 ```bash
 python scripts/eval/combine_evals.py /path/to/checkpoints
 ```
+
+## Differences From Original
+- For a clear change log against the original upstream repo (what changed, why, config args, and how to revert), see `docs/UPSTREAM_DIFF.md`.
