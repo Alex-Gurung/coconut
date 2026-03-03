@@ -49,6 +49,10 @@ def main() -> None:
     parser.add_argument("--gpus", default="0", help="Comma-separated GPU ids to use.")
     parser.add_argument("--torchrun", default="/mnt/disk/coconut/new4/bin/torchrun")
     parser.add_argument("--eval-script", default="/mnt/disk/coconut/run.py")
+    parser.add_argument("--checkpoints", default=None,
+                        help="Comma-separated checkpoint ids to eval (e.g. '8,16,24,32'). Default: all.")
+    parser.add_argument("--val-path", default=None,
+                        help="Override val_path in config (e.g. ff_data/val_litereason.json).")
     parser.add_argument("--out", default=None, help="Output summary base path (no extension).")
     args = parser.parse_args()
 
@@ -60,6 +64,12 @@ def main() -> None:
     checkpoints = _find_checkpoints(save_dir)
     if not checkpoints:
         raise SystemExit(f"No checkpoints found in {save_dir}")
+
+    if args.checkpoints:
+        keep = {int(x.strip()) for x in args.checkpoints.split(",")}
+        checkpoints = [c for c in checkpoints if _checkpoint_id(c) in keep]
+        if not checkpoints:
+            raise SystemExit(f"None of the requested checkpoint ids found in {save_dir}")
 
     gpus = [g.strip() for g in args.gpus.split(",") if g.strip() != ""]
     if not gpus:
@@ -74,6 +84,9 @@ def main() -> None:
         ckpt_id = _checkpoint_id(ckpt)
         eval_cfg = dict(base_cfg)
         eval_cfg["only_eval"] = True
+        eval_cfg["enable_gen_eval"] = True
+        if args.val_path:
+            eval_cfg["val_path"] = args.val_path
         eval_cfg["load_model_path"] = os.path.join(save_dir, ckpt)
         eval_cfg["resume"] = ckpt_id
         eval_cfg["name"] = f"{run_name}-eval-ckpt_{ckpt_id:03d}"
@@ -99,15 +112,20 @@ def main() -> None:
     completed_durations = []
     env_base = os.environ.copy()
 
+    base_port = 29500
+
     def launch(job, gpu_id):
         env = env_base.copy()
         env["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+        port = base_port + gpus.index(gpu_id)
         cmd = [
             args.torchrun,
             "--nnodes",
             "1",
             "--nproc_per_node",
             "1",
+            "--master_port",
+            str(port),
             args.eval_script,
             job["cfg_path"],
         ]

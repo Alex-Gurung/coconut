@@ -1,0 +1,44 @@
+# Coconut training - Qwen3 4B on Qwen3-generated FF traces
+# Based on v2 balanced config with corrected data path
+project: coconut
+save_path: /mnt/disk/coconut/checkpoints
+name: qwen3-coconut-ff-v3
+
+only_eval: False
+use_ddp: True
+torch_compile: False
+
+coconut: True
+cot: False
+no_thoughts: False
+no_cot: False
+use_chat_template: True
+use_boxed_answer: True
+max_new_tokens: 1024
+
+# Coconut curriculum settings
+c_thought: 1
+epochs_per_stage: 2
+max_latent_stage: 10
+pad_latent_to_max: True
+
+save_only_improve: False
+save_every: 2
+uniform_prob: 0.0
+
+model_id: Qwen/Qwen3-4B-Instruct-2507
+load_model_path: None
+seed: 42
+resume: 0
+bf16: True
+
+train_path: ff_data/qwen_train.json
+val_path: ff_data/qwen_val.json
+
+reset_optimizer: True
+batch_size_training: 1
+debug: False
+gradient_accumulation_steps: 4
+num_epochs: 33
+lr: !!float "5e-5"
+weight_decay: 0.01
