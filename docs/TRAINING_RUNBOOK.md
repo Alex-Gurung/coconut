@@ -1,4 +1,15 @@
-# Coconut Training Runbook (Strict Research Mode)
+# Legacy Flawed Fictions Runbook
+
+This document is now a legacy runbook for the Flawed Fictions workflow.
+
+The primary workflow in this repo is:
+
+- `experiments/gsm_hard_qwen3_4b/README.md`
+
+Use this file only if you are intentionally working on the older Flawed Fictions
+setup.
+
+---
 
 This runbook documents a strict, fail-fast pipeline for training and evaluating Coconut on Flawed Fictions data.
 

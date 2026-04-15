@@ -1,5 +1,11 @@
 # Evaluation Scripts
 
+Primary workflow note:
+
+- For GSM-Hard with `Qwen/Qwen3-4B-Instruct-2507`, start with
+  `experiments/gsm_hard_qwen3_4b/README.md`.
+- This document covers the lower-level multi-run eval helpers.
+
 Two scripts for managing multiple evaluation runs and computing statistical metrics:
 
 ## `scripts/eval/run_eval_n_times.py`
@@ -21,7 +27,7 @@ python scripts/eval/run_eval_n_times.py checkpoints/qwen-coconut-ff-v2/checkpoin
 
 **Evaluate a HuggingFace model 3 times with custom config:**
 ```bash
-python scripts/eval/run_eval_n_times.py Qwen/Qwen2.5-7B-Instruct 3 --config-base args/qwen_coconut_ff_v1_eval.yaml
+python scripts/eval/run_eval_n_times.py Qwen/Qwen3-4B-Instruct-2507 3 --config-base experiments/gsm_hard_qwen3_4b/eval.yaml
 ```
 
 **Evaluate with custom validation data:**
@@ -31,14 +37,14 @@ python scripts/eval/run_eval_n_times.py checkpoints/my-model 4 --val-path data/m
 
 ### Options
 
-- `--config-base`: Base config file to use as template (default: `args/qwen_coconut_ff_v1_eval.yaml`)
+- `--config-base`: Base config file to use as template (default: `args/qwen3_ff_coconut_strict_eval.yaml`)
 - `--name`: Name for the eval run (default: derived from checkpoint/model name)
 - `--val-path`: Path to validation/test data
-- `--num-gpus`: Number of GPUs to use with torchrun (default: 2)
+- `--num-gpus`: Number of GPUs to use with torchrun (default: 4)
 
 ### Output
 
-Each run creates an `eval_outputs_v{i}.json` file in the checkpoint directory with:
+Each run creates a per-run eval directory containing `eval_outputs.json` with:
 - Overall statistics (accuracy, token counts)
 - Per-sample results (question, answer, extracted answer, CoT, tokens)
 - Full config used for evaluation
@@ -57,14 +63,14 @@ python scripts/eval/combine_evals.py <eval_dir> [--output output.json]
 
 ### Examples
 
-**Combine all v*.json files from qwen-coconut-ff-v2:**
+**Combine all eval outputs under a run directory:**
 ```bash
-python scripts/eval/combine_evals.py checkpoints/qwen-coconut-ff-v2
+python scripts/eval/combine_evals.py checkpoints/qwen3-4b-coconut-gsm-hard
 ```
 
 **Combine with custom output path:**
 ```bash
-python scripts/eval/combine_evals.py checkpoints/qwen-coconut-ff-v2 --output results/combined_eval.json
+python scripts/eval/combine_evals.py checkpoints/qwen3-4b-coconut-gsm-hard --output results/combined_eval.json
 ```
 
 ### Output Format
@@ -133,10 +139,10 @@ The combined JSON file includes:
 
 ```bash
 # 1. Run evaluation 5 times with different seeds
-python scripts/eval/run_eval_n_times.py checkpoints/qwen-coconut-ff-v2/checkpoint_13 5 --name my_model_eval
+python scripts/eval/run_eval_n_times.py checkpoints/gsm_hard/qwen3-4b-coconut-gsm-hard/checkpoint_20 5 --name my_model_eval
 
 # 2. Combine results and compute SEM metrics
-python scripts/eval/combine_evals.py checkpoints/qwen-coconut-ff-v2 --output results/my_model_eval_combined.json
+python scripts/eval/combine_evals.py checkpoints/gsm_hard/qwen3-4b-coconut-gsm-hard --output results/my_model_eval_combined.json
 
 # 3. View the results
 cat results/my_model_eval_combined.json | python -m json.tool

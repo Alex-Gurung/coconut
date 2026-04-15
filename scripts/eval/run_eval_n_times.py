@@ -32,6 +32,9 @@ from queue import Queue
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
 def format_elapsed(seconds):
     m, s = divmod(int(seconds), 60)
     h, m = divmod(m, 60)
@@ -135,7 +138,7 @@ def main():
 
     name_base = args.name or dir_name
 
-    tmp_dir = Path("/mnt/disk/coconut/tmp")
+    tmp_dir = REPO_ROOT / "tmp"
     tmp_dir.mkdir(parents=True, exist_ok=True)
 
     jobs = []
@@ -210,11 +213,11 @@ def main():
                 "--nnodes", "1",
                 "--nproc_per_node", "1",
                 "--master_port", str(master_port),
-                "run.py",
+                str(REPO_ROOT / "run.py"),
                 job["config_file"],
             ]
             result = subprocess.run(
-                cmd, cwd="/mnt/disk/coconut", env=env,
+                cmd, cwd=str(REPO_ROOT), env=env,
                 capture_output=True, text=True,
             )
             with status_lock:

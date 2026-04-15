@@ -1,0 +1,43 @@
+project: coconut
+save_path: checkpoints/gsm_hard
+name: qwen3-4b-coconut-gsm-hard
+
+only_eval: false
+use_ddp: true
+torch_compile: false
+
+coconut: true
+cot: false
+no_thoughts: false
+no_cot: false
+use_chat_template: true
+use_boxed_answer: true
+enable_gen_eval: false
+max_new_tokens: 1024
+
+c_thought: 1
+epochs_per_stage: 2
+max_latent_stage: 10
+pad_latent_to_max: true
+
+save_only_improve: false
+save_every: 2
+uniform_prob: 0.0
+
+model_id: Qwen/Qwen3-4B-Instruct-2507
+load_model_path: "None"
+seed: 42
+resume: 0
+bf16: true
+latent_init_token: "<<"
+
+train_path: gsm_hard_data/qwen3_4b/train.json
+val_path: gsm_hard_data/qwen3_4b/val.json
+
+reset_optimizer: true
+batch_size_training: 1
+debug: false
+gradient_accumulation_steps: 64
+num_epochs: 20
+lr: !!float "5e-5"
+weight_decay: 0.01

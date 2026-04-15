@@ -4,7 +4,11 @@ import json
 import os
 import subprocess
 import time
+from pathlib import Path
 import yaml
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _checkpoint_id(name: str) -> int:
@@ -53,8 +57,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate all checkpoints and summarize accuracy.")
     parser.add_argument("--train-config", required=True, help="Training config YAML to mirror.")
     parser.add_argument("--gpus", default="0", help="Comma-separated GPU ids to use.")
-    parser.add_argument("--torchrun", default="/opt/conda/bin/torchrun")
-    parser.add_argument("--eval-script", default="/mnt/disk/coconut/run.py")
+    parser.add_argument("--torchrun", default="torchrun")
+    parser.add_argument("--eval-script", default=str(REPO_ROOT / "run.py"))
     parser.add_argument("--checkpoints", default=None,
                         help="Comma-separated checkpoint ids to eval (e.g. '8,16,24,32'). Default: all.")
     parser.add_argument("--val-path", default=None,
@@ -85,7 +89,7 @@ def main() -> None:
     if not gpus:
         raise SystemExit("No GPUs specified.")
 
-    tmp_dir = "/mnt/disk/coconut/tmp"
+    tmp_dir = str(REPO_ROOT / "tmp")
     os.makedirs(tmp_dir, exist_ok=True)
 
     # Helper to collect results from an eval_outputs.json

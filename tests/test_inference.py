@@ -3,7 +3,7 @@
 Test the Coconut inference script with examples
 """
 
-from coconut_inference import CoconutInference
+from scripts.eval.coconut_inference import CoconutInference
 
 def test_coconut_inference():
     """Test both reasoning and standard modes"""
