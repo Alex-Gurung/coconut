@@ -10,7 +10,7 @@ def check_requirements():
     print("=== Checking Requirements ===")
     
     # Check if config file exists
-    config_path = Path("args/qwen_coconut.yaml")
+    config_path = Path("args/legacy/qwen_coconut.yaml")
     if not config_path.exists():
         print("✗ Config file not found")
         return False
@@ -40,7 +40,7 @@ def setup_directories():
     """Create necessary directories"""
     print("\n=== Setting up Directories ===")
     
-    checkpoint_dir = Path("/mnt/disk/coconut/checkpoints")
+    checkpoint_dir = Path("checkpoints")
     checkpoint_dir.mkdir(exist_ok=True)
     print(f"✓ Checkpoint directory: {checkpoint_dir}")
 
@@ -61,7 +61,7 @@ def get_gpu_count():
 
 def create_training_command(num_gpus):
     """Create the torchrun command"""
-    config_path = "args/qwen_coconut.yaml"
+    config_path = "args/legacy/qwen_coconut.yaml"
     
     # Base torchrun command
     cmd = [

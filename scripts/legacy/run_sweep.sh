@@ -6,20 +6,21 @@
 # to find the best epoch. Final analysis compares across all configs.
 #
 # Usage:
-#   bash scripts/run_sweep.sh            # full sweep (4 GPUs)
-#   bash scripts/run_sweep.sh --dry-run  # print commands without executing
+#   bash scripts/legacy/run_sweep.sh            # full sweep (4 GPUs)
+#   bash scripts/legacy/run_sweep.sh --dry-run  # print commands without executing
 set -e
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 NUM_GPUS=4
-CKPT_BASE=/mnt/disk/coconut/checkpoints
+CKPT_BASE="$ROOT_DIR/checkpoints"
 
 CONFIGS=(
-  args/sweep_s3_c1.yaml
-  args/sweep_s3_c2.yaml
-  args/sweep_s10_c1.yaml
-  args/sweep_s10_c2.yaml
+  args/legacy/sweep_s3_c1.yaml
+  args/legacy/sweep_s3_c2.yaml
+  args/legacy/sweep_s10_c1.yaml
+  args/legacy/sweep_s10_c2.yaml
 )
 
 DRY_RUN=false
@@ -27,6 +28,8 @@ if [[ "${1:-}" == "--dry-run" ]]; then
   DRY_RUN=true
   echo "=== DRY RUN MODE ==="
 fi
+
+cd "$ROOT_DIR"
 
 SWEEP_START=$(date +%s)
 
@@ -72,7 +75,7 @@ echo "========================================"
 echo ""
 echo "  Running sweep analysis..."
 if $DRY_RUN; then
-  echo "[dry-run] python scripts/sweep_analysis.py $CKPT_BASE"
+  echo "[dry-run] python scripts/legacy/sweep_analysis.py $CKPT_BASE"
 else
-  python scripts/sweep_analysis.py "$CKPT_BASE"
+  python scripts/legacy/sweep_analysis.py "$CKPT_BASE"
 fi

@@ -110,7 +110,7 @@ Reference examples:
 ## 6) Flawed Fictions / Qwen-specific additions
 
 ### What changed
-- Added Qwen3 + Flawed Fictions experiment configs in `args/`.
+- Added Qwen3 + Flawed Fictions experiment configs in `args/legacy/`.
 - Added helper scripts for batched checkpoint eval and sweep analysis.
 
 ### Revert

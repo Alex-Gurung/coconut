@@ -12,4 +12,4 @@ echo "Effective batch size: 1 * 4 GPUs * 8 grad_accum = 32"
 echo "Memory optimization: expandable_segments=True"
 echo ""
 
-torchrun --nnodes 1 --nproc_per_node 4 run.py args/qwen_coconut.yaml
+torchrun --nnodes 1 --nproc_per_node 4 run.py args/legacy/qwen_coconut.yaml

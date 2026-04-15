@@ -44,13 +44,13 @@ This repo expects JSON arrays with:
 Your litereason trace files already match this schema. The command below merges Qwen+Gemma traces, drops invalid rows, deduplicates, and writes `ff_data/train.json` and `ff_data/val.json`.
 
 ```bash
-$PYTHON_BIN scripts/ff_pipeline.py prepare-data
+$PYTHON_BIN scripts/legacy/ff_pipeline.py prepare-data
 ```
 
 Quick sanity check:
 
 ```bash
-$PYTHON_BIN scripts/ff_pipeline.py dataset-stats
+$PYTHON_BIN scripts/legacy/ff_pipeline.py dataset-stats
 ```
 
 ## 2) Train
@@ -64,38 +64,38 @@ Important:
 Tokenizer strict precheck:
 
 ```bash
-$PYTHON_BIN scripts/ff_pipeline.py tokenizer-check --config args/qwen3_ff_coconut_strict_train.yaml
+$PYTHON_BIN scripts/legacy/ff_pipeline.py tokenizer-check --config args/legacy/qwen3_ff_coconut_strict_train.yaml
 ```
 
 Example (4 GPUs):
 
 ```bash
-torchrun --nnodes 1 --nproc_per_node 4 run.py args/qwen3_ff_coconut_strict_train.yaml
+torchrun --nnodes 1 --nproc_per_node 4 run.py args/legacy/qwen3_ff_coconut_strict_train.yaml
 ```
 
 Full Qwen3 run (ff v1 settings):
 
 ```bash
-torchrun --nnodes 1 --nproc_per_node 4 run.py args/qwen3_coconut_ff_v1_full.yaml
+torchrun --nnodes 1 --nproc_per_node 4 run.py args/legacy/qwen3_coconut_ff_v1_full.yaml
 ```
 
 Smoke (2 epochs, 10% train data):
 
 ```bash
-torchrun --nnodes 1 --nproc_per_node 4 run.py args/qwen3_coconut_ff_v1_smoke.yaml
-torchrun --nnodes 1 --nproc_per_node 4 run.py args/gemma3_coconut_ff_v1_smoke.yaml
+torchrun --nnodes 1 --nproc_per_node 4 run.py args/legacy/qwen3_coconut_ff_v1_smoke.yaml
+torchrun --nnodes 1 --nproc_per_node 4 run.py args/legacy/gemma3_coconut_ff_v1_smoke.yaml
 ```
 
 ## 3) Evaluate
 
-Use `args/qwen3_ff_coconut_strict_eval.yaml`:
+Use `args/legacy/qwen3_ff_coconut_strict_eval.yaml`:
 - Set `load_model_path` to the checkpoint file.
 - Set `resume` to the same checkpoint epoch (for matching latent stage).
 
 Run eval:
 
 ```bash
-torchrun --nnodes 1 --nproc_per_node 4 evalrun.py args/qwen3_ff_coconut_strict_eval.yaml
+torchrun --nnodes 1 --nproc_per_node 4 evalrun.py args/legacy/qwen3_ff_coconut_strict_eval.yaml
 ```
 
 Outputs are saved to:
@@ -111,7 +111,7 @@ Use the helper script to evaluate every checkpoint and summarize accuracy:
 ```bash
 PYTHON_BIN=/mnt/disk/coconut/new4/bin/python
 $PYTHON_BIN scripts/eval_checkpoints.py \
-  --train-config args/qwen3_coconut_ff_v1_full.yaml \
+  --train-config args/legacy/qwen3_coconut_ff_v1_full.yaml \
   --gpus 0,1,2,3
 ```
 
@@ -130,7 +130,7 @@ This writes:
 $PYTHON_BIN scripts/eval/run_eval_n_times.py \
   /mnt/disk/coconut/checkpoints/qwen3-ff-coconut-v1/checkpoint_14 \
   5 \
-  --config-base args/qwen3_ff_coconut_strict_eval.yaml \
+  --config-base args/legacy/qwen3_ff_coconut_strict_eval.yaml \
   --num-gpus 4
 ```
 
@@ -157,10 +157,10 @@ This keeps behavior deterministic and avoids silent fallback logic.
 
 ## Scripted Helpers
 
-Use `scripts/ff_pipeline.py` instead of ad-hoc inline commands:
+Use `scripts/legacy/ff_pipeline.py` instead of ad-hoc inline commands:
 
 ```bash
-$PYTHON_BIN scripts/ff_pipeline.py --help
+$PYTHON_BIN scripts/legacy/ff_pipeline.py --help
 ```
 
 Useful subcommands:
@@ -175,16 +175,16 @@ Useful subcommands:
 Example smoke flow:
 
 ```bash
-$PYTHON_BIN scripts/ff_pipeline.py make-smoke-config --out args/tmp_smoke_train.yaml
-torchrun --nnodes 1 --nproc_per_node 1 run.py args/tmp_smoke_train.yaml
+$PYTHON_BIN scripts/legacy/ff_pipeline.py make-smoke-config --out args/legacy/generated/tmp_smoke_train.yaml
+torchrun --nnodes 1 --nproc_per_node 1 run.py args/legacy/generated/tmp_smoke_train.yaml
 ```
 
 Example full run + eval config generation:
 
 ```bash
-$PYTHON_BIN scripts/ff_pipeline.py make-train-config --out args/qwen3_ff_coconut_run.yaml
-torchrun --nnodes 1 --nproc_per_node 4 run.py args/qwen3_ff_coconut_run.yaml
-$PYTHON_BIN scripts/ff_pipeline.py make-eval-config --train-config args/qwen3_ff_coconut_run.yaml --out args/qwen3_ff_coconut_run_eval.yaml
-torchrun --nnodes 1 --nproc_per_node 4 evalrun.py args/qwen3_ff_coconut_run_eval.yaml
-$PYTHON_BIN scripts/ff_pipeline.py show-eval --eval-config args/qwen3_ff_coconut_run_eval.yaml
+$PYTHON_BIN scripts/legacy/ff_pipeline.py make-train-config --out args/legacy/generated/qwen3_ff_coconut_run.yaml
+torchrun --nnodes 1 --nproc_per_node 4 run.py args/legacy/generated/qwen3_ff_coconut_run.yaml
+$PYTHON_BIN scripts/legacy/ff_pipeline.py make-eval-config --train-config args/legacy/generated/qwen3_ff_coconut_run.yaml --out args/legacy/generated/qwen3_ff_coconut_run_eval.yaml
+torchrun --nnodes 1 --nproc_per_node 4 evalrun.py args/legacy/generated/qwen3_ff_coconut_run_eval.yaml
+$PYTHON_BIN scripts/legacy/ff_pipeline.py show-eval --eval-config args/legacy/generated/qwen3_ff_coconut_run_eval.yaml
 ```

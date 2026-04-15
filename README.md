@@ -52,13 +52,16 @@ The runtime assumes you launch commands from the repo root.
 - `evalrun.py`: thin compatibility wrapper to `run.py`
 - `coconut.py`: Coconut model wrapper + generation logic
 - `dataset.py`: tokenization and collator
-- `args/`: legacy and secondary experiment configs
-- `scripts/`: utilities for eval, data prep, sweeps, and checkpoint checks
-- `docs/`: legacy notes, upstream diff notes, and archival docs
+- `args/`: generic examples plus `args/legacy/` for older configs
+- `scripts/`: primary helpers plus `scripts/legacy/` for older entrypoints
+- `docs/`: indexes, upstream diff notes, `docs/legacy/`, and `docs/archive/`
 
 ## Legacy / Secondary Material
 
-- Flawed Fictions workflow notes remain in `docs/` and `args/`, but are no longer
-  the primary path through this repo.
+- For repo navigation, see `args/README.md`, `scripts/legacy/README.md`, and
+  `docs/README.md`.
+- Flawed Fictions workflow notes now live under `docs/legacy/` and
+  `args/legacy/`.
+- Checkpoint retention and recovery notes now live under `docs/archive/`.
 - For upstream comparison notes, see `docs/UPSTREAM_DIFF.md`.
 - For the exact upstream codebase, use the local `original_coconut` branch.

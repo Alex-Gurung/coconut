@@ -8,8 +8,8 @@ Reads eval_outputs.json from sweep run directories and reports:
 - Per-class accuracy (TPR/TNR) if applicable
 
 Usage:
-    python scripts/sweep_analysis.py /mnt/disk/coconut/checkpoints
-    python scripts/sweep_analysis.py /mnt/disk/coconut/checkpoints --configs sweep-s3-c1 sweep-s10-c2
+    python scripts/legacy/sweep_analysis.py /mnt/disk/coconut/checkpoints
+    python scripts/legacy/sweep_analysis.py /mnt/disk/coconut/checkpoints --configs sweep-s3-c1 sweep-s10-c2
 """
 
 import argparse

@@ -1,17 +1,22 @@
 # Checkpoint Recovery
 
+Archive note:
+
+- This document is archival/reference material, not part of the primary
+  GSM-Hard workflow.
+
 This document tracks which local Coconut checkpoints have been verified as safe to
 replace with a Hugging Face pull, and which ones still require a local copy.
 
-## Full Audit As Of 2026-04-14
+## Full Audit As Of 2026-04-15
 
 All local `checkpoints/**/checkpoint_*` files were audited with
 `scripts/checks/audit_coconut_checkpoints.py`.
 
 - Local checkpoint files audited: `30`
-- Exact round-trip verified against an HF commit SHA: `3`
+- Exact round-trip verified against an HF commit SHA: `6`
 - Already replaced locally by an HF offload placeholder: `1`
-- No exact HF recovery path found yet: `26`
+- No exact HF recovery path found yet: `23`
 
 The audit scanned every public `agurung` model repo/ref that exposes
 `latent_metadata.json` and matched them against the exact local checkpoint paths in
@@ -60,6 +65,41 @@ The exact raw checkpoint will be at:
 
 ```text
 restore_qwen3_coconut_ff_ckpt32/latent_checkpoint.pt
+```
+
+### `checkpoints/qwen3-coconut-ff-v3/checkpoint_24`
+
+- HF repo: `agurung/coconut-qwen3-4b-ff`
+- Exact revision: `ab2ee7618ea3d87be00d7f1de9328a9144abb48e`
+- HF refs observed after republish: `checkpoint_24`, `checkpoint-24`
+- Local checkpoint SHA256:
+  `0602b2430cbc8b0a682ef4476fa43b08a773375eda7a3dd682674e0c2d6de216`
+- Tokenizer:
+  `<|start-latent|>` -> `151669`
+  `<|end-latent|>` -> `151670`
+  `<|latent|>` -> `151671`
+- Verification summary:
+  `399` base tensors matched exactly
+  raw `latent_checkpoint.pt` matched exactly
+  stale `model.safetensors` was removed before republish
+  HF snapshot includes `latent_metadata.json`
+
+Pull the exact verified snapshot:
+
+```python
+from huggingface_hub import snapshot_download
+
+snapshot_download(
+    repo_id="agurung/coconut-qwen3-4b-ff",
+    revision="ab2ee7618ea3d87be00d7f1de9328a9144abb48e",
+    local_dir="restore_qwen3_coconut_ff_ckpt24",
+)
+```
+
+The exact raw checkpoint will be at:
+
+```text
+restore_qwen3_coconut_ff_ckpt24/latent_checkpoint.pt
 ```
 
 ### `checkpoints/gemma/gemma3-coconut-ff-v3/checkpoint_32`
@@ -129,6 +169,74 @@ The exact raw checkpoint will be at:
 restore_gemma3_1b_coconut_gsm_hard_ckpt4/latent_checkpoint.pt
 ```
 
+### `checkpoints/gsm_hard/gemma3-1b-coconut-gsm-hard/checkpoint_8`
+
+- HF repo: `agurung/coconut-gemma-3-1b-gsm-hard`
+- Exact revision: `2828c87cd31bdba3288fffc64802d08b520da2ca`
+- HF refs observed after publish: `checkpoint_8`, `checkpoint-8`
+- Local checkpoint SHA256:
+  `12e59cf2f87d0d15d95da3462534143e49b21b230dd5890fc3388aef5a731f1e`
+- Tokenizer:
+  `<|start-latent|>` -> `262145`
+  `<|end-latent|>` -> `262146`
+  `<|latent|>` -> `262147`
+- Verification summary:
+  `341` base tensors matched exactly
+  raw `latent_checkpoint.pt` matched exactly
+  HF snapshot includes `latent_metadata.json`
+
+Pull the exact verified snapshot:
+
+```python
+from huggingface_hub import snapshot_download
+
+snapshot_download(
+    repo_id="agurung/coconut-gemma-3-1b-gsm-hard",
+    revision="2828c87cd31bdba3288fffc64802d08b520da2ca",
+    local_dir="restore_gemma3_1b_coconut_gsm_hard_ckpt8",
+)
+```
+
+The exact raw checkpoint will be at:
+
+```text
+restore_gemma3_1b_coconut_gsm_hard_ckpt8/latent_checkpoint.pt
+```
+
+### `checkpoints/gsm_hard/gemma3-1b-coconut-gsm-hard/checkpoint_12`
+
+- HF repo: `agurung/coconut-gemma-3-1b-gsm-hard`
+- Exact revision: `8067349326c3ebf4a07d56a7ba5a33e956487b5e`
+- HF refs observed after publish: `checkpoint_12`, `checkpoint-12`
+- Local checkpoint SHA256:
+  `a557beccce7615e6882c30a6096917fa2f741dafe1c51c1457e918bebf51f600`
+- Tokenizer:
+  `<|start-latent|>` -> `262145`
+  `<|end-latent|>` -> `262146`
+  `<|latent|>` -> `262147`
+- Verification summary:
+  `341` base tensors matched exactly
+  raw `latent_checkpoint.pt` matched exactly
+  HF snapshot includes `latent_metadata.json`
+
+Pull the exact verified snapshot:
+
+```python
+from huggingface_hub import snapshot_download
+
+snapshot_download(
+    repo_id="agurung/coconut-gemma-3-1b-gsm-hard",
+    revision="8067349326c3ebf4a07d56a7ba5a33e956487b5e",
+    local_dir="restore_gemma3_1b_coconut_gsm_hard_ckpt12",
+)
+```
+
+The exact raw checkpoint will be at:
+
+```text
+restore_gemma3_1b_coconut_gsm_hard_ckpt12/latent_checkpoint.pt
+```
+
 ## Already Offloaded Earlier
 
 ### `checkpoints/qwen-coconut-ff-v2/checkpoint_13`
@@ -159,10 +267,9 @@ No public `agurung` model repo/ref with `latent_metadata.json` points to any of
 these exact local checkpoint paths, so they do not yet have an exact HF recovery
 path recorded here:
 
-- `checkpoints/qwen3-coconut-ff-v3`: `checkpoint_24`
 - `checkpoints/qwen3-coconut-ff-reward-filtered-v1-2gpu`: `checkpoint_2`, `checkpoint_4`, `checkpoint_6`, `checkpoint_10`, `checkpoint_14`, `checkpoint_16`, `checkpoint_18`, `checkpoint_20`, `checkpoint_22`, `checkpoint_24`, `checkpoint_26`, `checkpoint_28`, `checkpoint_30`, `checkpoint_32`
 - `checkpoints/gemma/gemma3-coconut-ff-reward-filtered-v1-2gpu`: `checkpoint_20`, `checkpoint_24`, `checkpoint_28`, `checkpoint_32`
-- `checkpoints/gsm_hard/gemma3-1b-coconut-gsm-hard`: `checkpoint_8`, `checkpoint_12`, `checkpoint_16`, `checkpoint_20`, `checkpoint_24`, `checkpoint_28`, `checkpoint_32`
+- `checkpoints/gsm_hard/gemma3-1b-coconut-gsm-hard`: `checkpoint_16`, `checkpoint_20`, `checkpoint_24`, `checkpoint_28`, `checkpoint_32`
 
 ## Re-Verification
 
@@ -189,9 +296,39 @@ and:
 ```bash
 /mnt/disk/litereason_anon/.venv/bin/python \
   scripts/checks/verify_coconut_hf_roundtrip.py \
+  checkpoints/qwen3-coconut-ff-v3/checkpoint_24 \
+  agurung/coconut-qwen3-4b-ff \
+  ab2ee7618ea3d87be00d7f1de9328a9144abb48e
+```
+
+and:
+
+```bash
+/mnt/disk/litereason_anon/.venv/bin/python \
+  scripts/checks/verify_coconut_hf_roundtrip.py \
   checkpoints/gsm_hard/gemma3-1b-coconut-gsm-hard/checkpoint_4 \
   agurung/coconut-gemma-3-1b-gsm-hard \
   4c2bdcaa2934616d2f0c7a0f1d0f5ba611ec5db5
+```
+
+and:
+
+```bash
+/mnt/disk/litereason_anon/.venv/bin/python \
+  scripts/checks/verify_coconut_hf_roundtrip.py \
+  checkpoints/gsm_hard/gemma3-1b-coconut-gsm-hard/checkpoint_8 \
+  agurung/coconut-gemma-3-1b-gsm-hard \
+  2828c87cd31bdba3288fffc64802d08b520da2ca
+```
+
+and:
+
+```bash
+/mnt/disk/litereason_anon/.venv/bin/python \
+  scripts/checks/verify_coconut_hf_roundtrip.py \
+  checkpoints/gsm_hard/gemma3-1b-coconut-gsm-hard/checkpoint_12 \
+  agurung/coconut-gemma-3-1b-gsm-hard \
+  8067349326c3ebf4a07d56a7ba5a33e956487b5e
 ```
 
 To audit every local checkpoint path and round-trip verify any exact HF match that

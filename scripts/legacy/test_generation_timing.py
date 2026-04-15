@@ -9,9 +9,9 @@ Loads a checkpoint, runs generation on a few samples, and reports:
 - Number of generated tokens
 
 Usage:
-    python scripts/test_generation_timing.py \
+    python scripts/legacy/test_generation_timing.py \
         --checkpoint /mnt/disk/coconut/checkpoints/sweep-s3-c1/checkpoint_18 \
-        --config args/sweep_s3_c1.yaml \
+        --config args/legacy/sweep_s3_c1.yaml \
         --val-path ff_data/val_litereason.json \
         --num-samples 5 \
         --resume 18
@@ -25,7 +25,7 @@ import argparse
 import sys
 import os
 
-sys.path.insert(0, "/mnt/disk/coconut")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from coconut import Coconut

@@ -400,12 +400,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_stats.set_defaults(func=cmd_dataset_stats)
 
     p_tok = sub.add_parser("tokenizer-check", help="Run strict tokenizer checks against a training config.")
-    p_tok.add_argument("--config", default="args/qwen3_ff_coconut_strict_train.yaml")
+    p_tok.add_argument("--config", default="args/legacy/qwen3_ff_coconut_strict_train.yaml")
     p_tok.set_defaults(func=cmd_tokenizer_check)
 
     p_smoke = sub.add_parser("make-smoke-config", help="Create a debug/smoke training config from a base config.")
-    p_smoke.add_argument("--base", default="args/qwen3_ff_coconut_strict_train.yaml")
-    p_smoke.add_argument("--out", default="args/tmp_smoke_train.yaml")
+    p_smoke.add_argument("--base", default="args/legacy/qwen3_ff_coconut_strict_train.yaml")
+    p_smoke.add_argument("--out", default="args/legacy/generated/tmp_smoke_train.yaml")
     p_smoke.add_argument("--name-prefix", default="qwen3-ff-coconut-smoke")
     p_smoke.add_argument("--name", default=None)
     p_smoke.add_argument("--num-epochs", type=int, default=1)
@@ -416,16 +416,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_smoke.set_defaults(func=cmd_make_smoke_config)
 
     p_train = sub.add_parser("make-train-config", help="Create a timestamped training config from a base config.")
-    p_train.add_argument("--base", default="args/qwen3_ff_coconut_strict_train.yaml")
-    p_train.add_argument("--out", default="args/qwen3_ff_coconut_run.yaml")
+    p_train.add_argument("--base", default="args/legacy/qwen3_ff_coconut_strict_train.yaml")
+    p_train.add_argument("--out", default="args/legacy/generated/qwen3_ff_coconut_run.yaml")
     p_train.add_argument("--name-prefix", default="qwen3-ff-coconut")
     p_train.add_argument("--name", default=None)
     p_train.set_defaults(func=cmd_make_train_config)
 
     p_eval = sub.add_parser("make-eval-config", help="Create eval config for latest (or explicit) checkpoint.")
-    p_eval.add_argument("--train-config", default="args/qwen3_ff_coconut_run.yaml")
-    p_eval.add_argument("--base-eval", default="args/qwen3_ff_coconut_strict_eval.yaml")
-    p_eval.add_argument("--out", default="args/qwen3_ff_coconut_run_eval.yaml")
+    p_eval.add_argument("--train-config", default="args/legacy/generated/qwen3_ff_coconut_run.yaml")
+    p_eval.add_argument("--base-eval", default="args/legacy/qwen3_ff_coconut_strict_eval.yaml")
+    p_eval.add_argument("--out", default="args/legacy/generated/qwen3_ff_coconut_run_eval.yaml")
     p_eval.add_argument("--checkpoint", default=None)
     p_eval.add_argument("--resume", type=int, default=None)
     p_eval.add_argument("--val-path", default=None)
@@ -446,7 +446,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_bal.set_defaults(func=cmd_prepare_balanced_data)
 
     p_show = sub.add_parser("show-eval", help="Show key metrics from eval_outputs.json.")
-    p_show.add_argument("--eval-config", default="args/qwen3_ff_coconut_run_eval.yaml")
+    p_show.add_argument("--eval-config", default="args/legacy/generated/qwen3_ff_coconut_run_eval.yaml")
     p_show.add_argument("--eval-output", default=None)
     p_show.set_defaults(func=cmd_show_eval)
 

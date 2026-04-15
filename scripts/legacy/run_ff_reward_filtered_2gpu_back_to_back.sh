@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="/mnt/disk/coconut"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-/tmp/.venv/bin/python}"
 GPUS="${GPUS:-0,1}"
 NPROC="${NPROC:-2}"
 
-GEMMA_CFG="${GEMMA_CFG:-args/gemma3_coconut_ff_reward_filtered_v1_2gpu.yaml}"
-QWEN_CFG="${QWEN_CFG:-args/qwen3_coconut_ff_reward_filtered_v1_2gpu.yaml}"
+GEMMA_CFG="${GEMMA_CFG:-args/legacy/gemma3_coconut_ff_reward_filtered_v1_2gpu.yaml}"
+QWEN_CFG="${QWEN_CFG:-args/legacy/qwen3_coconut_ff_reward_filtered_v1_2gpu.yaml}"
 
 QWEN_TRAIN="${QWEN_TRAIN:-$ROOT/ff_data/qwen_reward_filtered_train.json}"
 QWEN_VAL="${QWEN_VAL:-$ROOT/ff_data/qwen_reward_filtered_val.json}"
@@ -30,7 +30,7 @@ cd "$ROOT"
 
 if [[ ! -f "$QWEN_TRAIN" || ! -f "$QWEN_VAL" ]]; then
   echo "Qwen reward-filtered data missing. Building it now..."
-  "$PYTHON_BIN" scripts/build_ff_reward_filtered_data.py \
+  "$PYTHON_BIN" scripts/legacy/build_ff_reward_filtered_data.py \
     --trace "$QWEN_TRAIN_TRACE" "$QWEN_VAL_TRACE" \
     --train-out "$QWEN_TRAIN" \
     --val-out "$QWEN_VAL"
