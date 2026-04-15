@@ -1,0 +1,219 @@
+{
+  "generated_on": "2026-04-14",
+  "author_namespace": "agurung",
+  "default_publish_profile": "conservative_archive",
+  "description": "Faithful HF publish plan for Coconut checkpoints. Export/upload entries should be round-trip verified against the returned immutable commit SHA before any local pruning.",
+  "profiles": {
+    "balanced_local": {
+      "description": "Checkpoint subset intended to remain on local disk after archival."
+    },
+    "conservative_archive": {
+      "description": "Checkpoint superset intended to be archived on Hugging Face."
+    }
+  },
+  "entries": [
+    {
+      "checkpoint": "checkpoints/qwen3-coconut-ff-v3/checkpoint_24",
+      "profiles": [
+        "balanced_local",
+        "conservative_archive"
+      ],
+      "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+      "repo_id": "agurung/coconut-qwen3-4b-ff",
+      "revision": "checkpoint_24",
+      "tag": "checkpoint-24",
+      "action": "export_upload_verify"
+    },
+    {
+      "checkpoint": "checkpoints/qwen3-coconut-ff-v3/checkpoint_32",
+      "profiles": [
+        "conservative_archive"
+      ],
+      "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+      "repo_id": "agurung/coconut-qwen3-4b-ff",
+      "revision": "checkpoint_32",
+      "tag": "checkpoint-32",
+      "action": "create_refs_only",
+      "source_revision": "92248e30dd55c021b5c3950ad9c386f861b104f2",
+      "notes": [
+        "Already exact round-trip verified on the repo main history."
+      ]
+    },
+    {
+      "checkpoint": "checkpoints/gemma/gemma3-coconut-ff-v3/checkpoint_32",
+      "profiles": [
+        "conservative_archive"
+      ],
+      "model_id": "google/gemma-3-4b-it",
+      "repo_id": "agurung/coconut-gemma-3-4b-ff",
+      "revision": "checkpoint_32",
+      "tag": "checkpoint-32",
+      "action": "create_refs_only",
+      "source_revision": "f59d39cf36b126140a2b775ef7d82643f8bceb17",
+      "notes": [
+        "Already exact round-trip verified on the repo main history."
+      ]
+    },
+    {
+      "checkpoint": "checkpoints/qwen3-coconut-ff-reward-filtered-v1-2gpu/checkpoint_20",
+      "profiles": [
+        "balanced_local",
+        "conservative_archive"
+      ],
+      "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+      "repo_id": "agurung/coconut-qwen3-4b-ff-reward-filtered",
+      "revision": "checkpoint_20",
+      "tag": "checkpoint-20",
+      "action": "export_upload_verify"
+    },
+    {
+      "checkpoint": "checkpoints/qwen3-coconut-ff-reward-filtered-v1-2gpu/checkpoint_22",
+      "profiles": [
+        "conservative_archive"
+      ],
+      "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+      "repo_id": "agurung/coconut-qwen3-4b-ff-reward-filtered",
+      "revision": "checkpoint_22",
+      "tag": "checkpoint-22",
+      "action": "export_upload_verify"
+    },
+    {
+      "checkpoint": "checkpoints/qwen3-coconut-ff-reward-filtered-v1-2gpu/checkpoint_24",
+      "profiles": [
+        "balanced_local",
+        "conservative_archive"
+      ],
+      "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+      "repo_id": "agurung/coconut-qwen3-4b-ff-reward-filtered",
+      "revision": "checkpoint_24",
+      "tag": "checkpoint-24",
+      "action": "export_upload_verify"
+    },
+    {
+      "checkpoint": "checkpoints/qwen3-coconut-ff-reward-filtered-v1-2gpu/checkpoint_26",
+      "profiles": [
+        "conservative_archive"
+      ],
+      "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+      "repo_id": "agurung/coconut-qwen3-4b-ff-reward-filtered",
+      "revision": "checkpoint_26",
+      "tag": "checkpoint-26",
+      "action": "export_upload_verify"
+    },
+    {
+      "checkpoint": "checkpoints/qwen3-coconut-ff-reward-filtered-v1-2gpu/checkpoint_32",
+      "profiles": [
+        "balanced_local",
+        "conservative_archive"
+      ],
+      "model_id": "Qwen/Qwen3-4B-Instruct-2507",
+      "repo_id": "agurung/coconut-qwen3-4b-ff-reward-filtered",
+      "revision": "checkpoint_32",
+      "tag": "checkpoint-32",
+      "action": "export_upload_verify"
+    },
+    {
+      "checkpoint": "checkpoints/gemma/gemma3-coconut-ff-reward-filtered-v1-2gpu/checkpoint_20",
+      "profiles": [
+        "conservative_archive"
+      ],
+      "model_id": "google/gemma-3-4b-it",
+      "repo_id": "agurung/coconut-gemma-3-4b-ff-reward-filtered",
+      "revision": "checkpoint_20",
+      "tag": "checkpoint-20",
+      "action": "export_upload_verify"
+    },
+    {
+      "checkpoint": "checkpoints/gemma/gemma3-coconut-ff-reward-filtered-v1-2gpu/checkpoint_24",
+      "profiles": [
+        "conservative_archive"
+      ],
+      "model_id": "google/gemma-3-4b-it",
+      "repo_id": "agurung/coconut-gemma-3-4b-ff-reward-filtered",
+      "revision": "checkpoint_24",
+      "tag": "checkpoint-24",
+      "action": "export_upload_verify"
+    },
+    {
+      "checkpoint": "checkpoints/gemma/gemma3-coconut-ff-reward-filtered-v1-2gpu/checkpoint_28",
+      "profiles": [
+        "conservative_archive"
+      ],
+      "model_id": "google/gemma-3-4b-it",
+      "repo_id": "agurung/coconut-gemma-3-4b-ff-reward-filtered",
+      "revision": "checkpoint_28",
+      "tag": "checkpoint-28",
+      "action": "export_upload_verify"
+    },
+    {
+      "checkpoint": "checkpoints/gemma/gemma3-coconut-ff-reward-filtered-v1-2gpu/checkpoint_32",
+      "profiles": [
+        "balanced_local",
+        "conservative_archive"
+      ],
+      "model_id": "google/gemma-3-4b-it",
+      "repo_id": "agurung/coconut-gemma-3-4b-ff-reward-filtered",
+      "revision": "checkpoint_32",
+      "tag": "checkpoint-32",
+      "action": "export_upload_verify"
+    },
+    {
+      "checkpoint": "checkpoints/gsm_hard/gemma3-1b-coconut-gsm-hard/checkpoint_4",
+      "profiles": [
+        "balanced_local",
+        "conservative_archive"
+      ],
+      "model_id": "google/gemma-3-1b-it",
+      "repo_id": "agurung/coconut-gemma-3-1b-gsm-hard",
+      "revision": "checkpoint_4",
+      "tag": "checkpoint-4",
+      "action": "export_upload_verify"
+    },
+    {
+      "checkpoint": "checkpoints/gsm_hard/gemma3-1b-coconut-gsm-hard/checkpoint_8",
+      "profiles": [
+        "conservative_archive"
+      ],
+      "model_id": "google/gemma-3-1b-it",
+      "repo_id": "agurung/coconut-gemma-3-1b-gsm-hard",
+      "revision": "checkpoint_8",
+      "tag": "checkpoint-8",
+      "action": "export_upload_verify"
+    },
+    {
+      "checkpoint": "checkpoints/gsm_hard/gemma3-1b-coconut-gsm-hard/checkpoint_12",
+      "profiles": [
+        "conservative_archive"
+      ],
+      "model_id": "google/gemma-3-1b-it",
+      "repo_id": "agurung/coconut-gemma-3-1b-gsm-hard",
+      "revision": "checkpoint_12",
+      "tag": "checkpoint-12",
+      "action": "export_upload_verify"
+    },
+    {
+      "checkpoint": "checkpoints/gsm_hard/gemma3-1b-coconut-gsm-hard/checkpoint_24",
+      "profiles": [
+        "balanced_local",
+        "conservative_archive"
+      ],
+      "model_id": "google/gemma-3-1b-it",
+      "repo_id": "agurung/coconut-gemma-3-1b-gsm-hard",
+      "revision": "checkpoint_24",
+      "tag": "checkpoint-24",
+      "action": "export_upload_verify"
+    },
+    {
+      "checkpoint": "checkpoints/gsm_hard/gemma3-1b-coconut-gsm-hard/checkpoint_32",
+      "profiles": [
+        "balanced_local",
+        "conservative_archive"
+      ],
+      "model_id": "google/gemma-3-1b-it",
+      "repo_id": "agurung/coconut-gemma-3-1b-gsm-hard",
+      "revision": "checkpoint_32",
+      "tag": "checkpoint-32",
+      "action": "export_upload_verify"
+    }
+  ]
+}

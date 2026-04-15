@@ -3,6 +3,7 @@
 /data/
 /ff_data/
 /ff_rl_data/
+/gsm_hard_data/
 /musr_data/
 /musr_rl_data/
 /ncp_data/
@@ -10,6 +11,7 @@
 /models/
 /coconut_model_hf/
 /extracted_hf_model/
+/hf_exports/
 
 # Experiment outputs
 /wandb/
@@ -25,4 +27,3 @@ __pycache__/
 
 # Large or generated files
 *.zip
-*.json

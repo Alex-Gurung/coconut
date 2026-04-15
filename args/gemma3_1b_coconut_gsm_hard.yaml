@@ -1,0 +1,49 @@
+# Coconut training - Gemma 3 1B IT on GSM-Hard traces
+# Expects LiteReason-prepared CoCoNut-format JSON arrays at:
+#   /mnt/disk/coconut/gsm_hard_data/gemma3_1b/train.json
+#   /mnt/disk/coconut/gsm_hard_data/gemma3_1b/val.json
+project: coconut
+save_path: /mnt/disk/coconut/checkpoints/gsm_hard
+name: gemma3-1b-coconut-gsm-hard
+
+only_eval: False
+use_ddp: True
+torch_compile: False
+
+coconut: True
+cot: False
+no_thoughts: False
+no_cot: False
+use_chat_template: True
+use_boxed_answer: True
+max_new_tokens: 2048
+
+# Coconut curriculum settings
+c_thought: 1
+epochs_per_stage: 2
+max_latent_stage: 10
+pad_latent_to_max: True
+
+save_only_improve: False
+save_every: 4
+uniform_prob: 0.0
+
+# Gemma 3 sliding-window attention is incompatible with Coconut's cropped KV cache.
+disable_kv_cache: True
+
+model_id: google/gemma-3-1b-it
+load_model_path: None
+seed: 42
+resume: 0
+bf16: True
+
+train_path: gsm_hard_data/gemma3_1b/train.json
+val_path: gsm_hard_data/gemma3_1b/val.json
+
+reset_optimizer: True
+batch_size_training: 4
+debug: False
+gradient_accumulation_steps: 4
+num_epochs: 33
+lr: !!float "5e-5"
+weight_decay: 0.01

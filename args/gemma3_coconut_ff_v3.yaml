@@ -1,0 +1,48 @@
+# Coconut training - Gemma 3 4B IT on Gemma-generated FF traces
+# Based on qwen3_coconut_ff_v3 config
+project: coconut
+save_path: /mnt/disk/coconut/checkpoints/gemma
+name: gemma3-coconut-ff-v3
+
+only_eval: False
+use_ddp: True
+torch_compile: False
+
+coconut: True
+cot: False
+no_thoughts: False
+no_cot: False
+use_chat_template: True
+use_boxed_answer: True
+max_new_tokens: 1024
+
+# Coconut curriculum settings
+c_thought: 1
+epochs_per_stage: 2
+max_latent_stage: 10
+pad_latent_to_max: True
+
+save_only_improve: False
+save_every: 4
+uniform_prob: 0.0
+
+# Gemma 3 uses sliding-window attention whose KV cache cannot be cropped;
+# disable Coconut's incremental cache to avoid errors (trades compute for compatibility).
+disable_kv_cache: True
+
+model_id: google/gemma-3-4b-it
+load_model_path: None
+seed: 42
+resume: 0
+bf16: True
+
+train_path: ff_data/gemma_train.json
+val_path: ff_data/gemma_val.json
+
+reset_optimizer: True
+batch_size_training: 1
+debug: False
+gradient_accumulation_steps: 4
+num_epochs: 33
+lr: !!float "5e-5"
+weight_decay: 0.01

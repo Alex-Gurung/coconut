@@ -32,13 +32,19 @@ def _find_checkpoints(save_dir: str) -> list[str]:
     return ckpts
 
 
+def _latent_stage(epoch: int, epochs_per_stage: int, max_latent_stage: int) -> int:
+    return min(epoch // epochs_per_stage, max_latent_stage)
+
+
 def _pretty_md(rows: list[dict]) -> str:
-    header = "| checkpoint | accuracy | cot_em | samples | eval_dir |"
-    sep = "|---|---|---|---|---|"
+    header = "| checkpoint | stage | latents | accuracy | avg_gen_tokens | samples |"
+    sep = "|---|---|---|---|---|---|"
     lines = [header, sep]
     for row in rows:
         lines.append(
-            f"| {row['checkpoint']} | {row['accuracy']:.4f} | {row['cot_em']:.4f} | {row['samples']} | {row['eval_dir']} |"
+            f"| {row['checkpoint']} | {row['stage']} | {row['num_latents']}"
+            f" | {row['accuracy']:.4f}"
+            f" | {row['avg_gen_tokens']:.1f} | {row['samples']} |"
         )
     return "\n".join(lines) + "\n"
 
@@ -47,12 +53,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate all checkpoints and summarize accuracy.")
     parser.add_argument("--train-config", required=True, help="Training config YAML to mirror.")
     parser.add_argument("--gpus", default="0", help="Comma-separated GPU ids to use.")
-    parser.add_argument("--torchrun", default="/mnt/disk/coconut/new4/bin/torchrun")
+    parser.add_argument("--torchrun", default="/opt/conda/bin/torchrun")
     parser.add_argument("--eval-script", default="/mnt/disk/coconut/run.py")
     parser.add_argument("--checkpoints", default=None,
                         help="Comma-separated checkpoint ids to eval (e.g. '8,16,24,32'). Default: all.")
     parser.add_argument("--val-path", default=None,
                         help="Override val_path in config (e.g. ff_data/val_litereason.json).")
+    parser.add_argument("--eval-suffix", default=None,
+                        help="Suffix appended to eval directory names (e.g. 'test' -> *-eval-ckpt_004-test).")
+    parser.add_argument("--skip-existing", action="store_true",
+                        help="Skip checkpoints that already have eval_outputs.json and collect their results.")
     parser.add_argument("--out", default=None, help="Output summary base path (no extension).")
     args = parser.parse_args()
 
@@ -78,10 +88,56 @@ def main() -> None:
     tmp_dir = "/mnt/disk/coconut/tmp"
     os.makedirs(tmp_dir, exist_ok=True)
 
+    # Helper to collect results from an eval_outputs.json
+    epochs_per_stage = base_cfg.get("epochs_per_stage", 1)
+    max_latent_stage = base_cfg.get("max_latent_stage", 100)
+    c_thought = base_cfg.get("c_thought", 1)
+
+    def _collect_result(ckpt_name: str, ckpt_id: int, eval_dir: str) -> dict:
+        stage = _latent_stage(ckpt_id, epochs_per_stage, max_latent_stage)
+        num_latents = stage * c_thought
+        summary_path = os.path.join(eval_dir, "eval_outputs.json")
+        if os.path.exists(summary_path):
+            with open(summary_path, "r") as f:
+                payload = json.load(f)
+            outputs = payload.get("outputs", [])
+            gen_counts = [e.get("gen_tokens", e.get("num_cot_tokens", 0)) for e in outputs if e]
+            avg_gen = sum(gen_counts) / len(gen_counts) if gen_counts else 0.0
+            return {
+                "checkpoint": ckpt_name,
+                "stage": stage,
+                "num_latents": num_latents,
+                "accuracy": payload.get("accuracy", 0.0),
+                "avg_gen_tokens": avg_gen,
+                "samples": payload.get("total_samples", 0),
+                "eval_dir": eval_dir,
+            }
+        return {
+            "checkpoint": ckpt_name,
+            "stage": stage,
+            "num_latents": num_latents,
+            "accuracy": 0.0,
+            "avg_gen_tokens": 0.0,
+            "samples": 0,
+            "eval_dir": eval_dir,
+        }
+
     # Prepare jobs
     jobs = []
+    existing_results = []
+    suffix = f"-{args.eval_suffix}" if args.eval_suffix else ""
+
     for ckpt in checkpoints:
         ckpt_id = _checkpoint_id(ckpt)
+        eval_name = f"{run_name}-eval-ckpt_{ckpt_id:03d}{suffix}"
+        eval_dir = os.path.join(save_path, eval_name)
+
+        # Skip if results already exist
+        if args.skip_existing and os.path.exists(os.path.join(eval_dir, "eval_outputs.json")):
+            existing_results.append(_collect_result(ckpt, ckpt_id, eval_dir))
+            print(f"Skipping {ckpt} (existing results in {eval_dir})")
+            continue
+
         eval_cfg = dict(base_cfg)
         eval_cfg["only_eval"] = True
         eval_cfg["enable_gen_eval"] = True
@@ -89,7 +145,7 @@ def main() -> None:
             eval_cfg["val_path"] = args.val_path
         eval_cfg["load_model_path"] = os.path.join(save_dir, ckpt)
         eval_cfg["resume"] = ckpt_id
-        eval_cfg["name"] = f"{run_name}-eval-ckpt_{ckpt_id:03d}"
+        eval_cfg["name"] = eval_name
         # Ensure eval uses full validation set
         eval_cfg["debug"] = False
         eval_cfg["use_ddp"] = True
@@ -101,9 +157,14 @@ def main() -> None:
                 "ckpt": ckpt,
                 "ckpt_id": ckpt_id,
                 "cfg_path": cfg_path,
-                "eval_dir": os.path.join(save_path, eval_cfg["name"]),
+                "eval_dir": eval_dir,
             }
         )
+
+    if existing_results:
+        print(f"Collected {len(existing_results)} existing results.")
+    if not jobs:
+        print("All checkpoints already evaluated, writing summary.")
 
     # Launch jobs across GPUs
     running = {}
@@ -164,30 +225,7 @@ def main() -> None:
                 print(f"Eval failed for {job['ckpt']} on GPU {gpu_id} (exit {proc.returncode}).")
             duration = time.time() - job_start
             completed_durations.append(duration)
-            # Collect results if present
-            summary_path = os.path.join(job["eval_dir"], "eval_outputs.json")
-            if os.path.exists(summary_path):
-                with open(summary_path, "r") as f:
-                    payload = json.load(f)
-                results.append(
-                    {
-                        "checkpoint": job["ckpt"],
-                        "accuracy": payload.get("accuracy", 0.0),
-                        "cot_em": payload.get("cot_exact_match", 0.0),
-                        "samples": payload.get("total_samples", 0),
-                        "eval_dir": job["eval_dir"],
-                    }
-                )
-            else:
-                results.append(
-                    {
-                        "checkpoint": job["ckpt"],
-                        "accuracy": 0.0,
-                        "cot_em": 0.0,
-                        "samples": 0,
-                        "eval_dir": job["eval_dir"],
-                    }
-                )
+            results.append(_collect_result(job["ckpt"], job["ckpt_id"], job["eval_dir"]))
             del running[gpu_id]
             if pending:
                 launch(pending.pop(0), gpu_id)
@@ -219,9 +257,11 @@ def main() -> None:
                 else:
                     print(f"GPU {gpu_id}: idle")
 
-    # Sort and write summary
-    results = sorted(results, key=lambda r: r["accuracy"], reverse=True)
-    out_base = args.out or os.path.join(save_dir, "eval_summary")
+    # Merge existing + newly evaluated, sort by checkpoint order
+    results = existing_results + results
+    results = sorted(results, key=lambda r: _checkpoint_id(r["checkpoint"]))
+    summary_name = f"eval_summary{suffix}" if suffix else "eval_summary"
+    out_base = args.out or os.path.join(save_dir, summary_name)
     with open(out_base + ".json", "w") as f:
         json.dump(results, f, indent=2)
     with open(out_base + ".md", "w") as f:
@@ -231,7 +271,7 @@ def main() -> None:
     print(out_base + ".json")
     print(out_base + ".md")
     if results:
-        best = results[0]
+        best = max(results, key=lambda r: r["accuracy"])
         print(
             f"Best checkpoint: {best['checkpoint']} (accuracy {best['accuracy']:.4f}) -> {best['eval_dir']}"
         )

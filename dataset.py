@@ -15,7 +15,17 @@ from transformers import PreTrainedTokenizerBase
 from transformers.data.data_collator import pad_without_fast_tokenizer_warning
 
 
-def get_dataset(path, tokenizer, max_size=1000000000, use_chat_template=False):
+def get_dataset(
+    path,
+    tokenizer,
+    max_size=1000000000,
+    use_chat_template=False,
+    answer_prefix="In summary, ",
+):
+
+    def _format_answer_text(answer):
+        prefix = "" if answer_prefix is None else str(answer_prefix)
+        return prefix + answer
 
     def _chat_template_ids(messages, add_generation_prompt):
         rendered = tokenizer.apply_chat_template(
@@ -49,7 +59,7 @@ def get_dataset(path, tokenizer, max_size=1000000000, use_chat_template=False):
             for step in sample["steps"]:
                 assistant_content_parts.append(step + "\n")
 
-            assistant_content_parts.append("In summary, " + sample["answer"])
+            assistant_content_parts.append(_format_answer_text(sample["answer"]))
             assistant_content = "".join(assistant_content_parts)
 
             assistant_message = {
@@ -76,8 +86,7 @@ def get_dataset(path, tokenizer, max_size=1000000000, use_chat_template=False):
                 steps_tokenized.append(list(span))
                 offset += len(step_tokens)
 
-            # answer_text = "### " + sample["answer"]
-            answer_text = "In summary, " + sample["answer"]
+            answer_text = _format_answer_text(sample["answer"])
             answer_no_eos = tokenizer.encode(answer_text, add_special_tokens=False)
             answer_span = assistant_tokens[offset : offset + len(answer_no_eos)]
             if len(answer_span) != len(answer_no_eos):
@@ -112,7 +121,7 @@ def get_dataset(path, tokenizer, max_size=1000000000, use_chat_template=False):
             #     "### " + sample["answer"], add_special_tokens=False
             # ) + [tokenizer.eos_token_id]
             answer_tokenized = tokenizer.encode(
-                "In summary, " + sample["answer"], add_special_tokens=False
+                _format_answer_text(sample["answer"]), add_special_tokens=False
             ) + [tokenizer.eos_token_id]
 
         sample = {
@@ -154,8 +163,7 @@ def get_dataset(path, tokenizer, max_size=1000000000, use_chat_template=False):
             assistant_content = ""
             if d["steps"]:
                 assistant_content += "\n".join(d["steps"]) + "\n"
-            # assistant_content += "### " + d["answer"]
-            assistant_content += "In summary, " + d["answer"]
+            assistant_content += _format_answer_text(d["answer"])
             conversation = [
                 user_message,
                 {"role": "assistant", "content": assistant_content},
@@ -164,8 +172,13 @@ def get_dataset(path, tokenizer, max_size=1000000000, use_chat_template=False):
                 conversation, add_generation_prompt=False
             ) + [tokenizer.eos_token_id]
         else:
-            # complete = d["question"] + "\n" + "\n".join(d["steps"]) + "\n### " + d["answer"]
-            complete = d["question"] + "\n" + "\n".join(d["steps"]) + "\nIn summary, " + d["answer"]
+            complete = (
+                d["question"]
+                + "\n"
+                + "\n".join(d["steps"])
+                + "\n"
+                + _format_answer_text(d["answer"])
+            )
             complete_tokenized = tokenizer.encode(complete, add_special_tokens=True) + [
                 tokenizer.eos_token_id
             ]

@@ -3,11 +3,16 @@
 
 # Apply Liger kernel optimizations globally before model loading
 try:
-    from liger_kernel.transformers import apply_liger_kernel_to_qwen2
-    apply_liger_kernel_to_qwen2()
-    print("✓ Applied Liger kernel optimizations globally")
+    from liger_kernel.transformers import apply_liger_kernel_to_qwen2, apply_liger_kernel_to_gemma2
+    _liger_registry = {
+        "qwen2": apply_liger_kernel_to_qwen2,
+        "gemma2": apply_liger_kernel_to_gemma2,
+    }
+    _liger_applied = False  # applied later once model_id is known
+    print("✓ Liger kernels available (will apply after model selection)")
 except Exception as e:
-    print(f"Could not apply Liger kernels: {e}")
+    _liger_registry = {}
+    print(f"Could not import Liger kernels: {e}")
 
 import torch
 import torch.distributed
@@ -23,6 +28,11 @@ from torch.utils.data.distributed import DistributedSampler
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from transformers.models.gpt2.modeling_gpt2 import GPT2Block
+
+try:
+    from transformers.models.gemma3.modeling_gemma3 import Gemma3DecoderLayer
+except ImportError:
+    Gemma3DecoderLayer = None
 
 from coconut import Coconut
 from dataset import (
@@ -56,6 +66,7 @@ OPTIONAL_CONFIG_DEFAULTS = {
     "eval_top_k": None,
     "use_chat_template": False,
     "use_boxed_answer": True,
+    "answer_prefix": "In summary, ",
     "use_ddp": False,
     "torch_compile": False,
     "save_every": 1,
@@ -64,6 +75,7 @@ OPTIONAL_CONFIG_DEFAULTS = {
     "train_fraction": None,
     "max_new_tokens": None,
     "max_eval_samples": None,
+    "disable_kv_cache": False,
 }
 
 
@@ -188,6 +200,15 @@ def main():
             f"Loading from {configs.load_model_path} and skip the first {configs.resume} epochs"
         )
 
+    # Apply Liger kernel for the right model family before loading
+    if _liger_registry:
+        model_id_lower = configs.model_id.lower()
+        for key, apply_fn in _liger_registry.items():
+            if key in model_id_lower:
+                apply_fn()
+                print(f"✓ Applied Liger kernel optimizations for {key}")
+                break
+
     # Load model with Flash Attention 2 for speed
     model = AutoModelForCausalLM.from_pretrained(
         configs.model_id,
@@ -196,6 +217,8 @@ def main():
         device_map=None,  # We handle device placement manually
     )
     print("✓ Loaded model with Flash Attention 2")
+    model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+    print("✓ Enabled gradient checkpointing")
     tokenizer = AutoTokenizer.from_pretrained(configs.model_id)
     if tokenizer.eos_token is None:
         raise ValueError(
@@ -293,7 +316,8 @@ def main():
         configs.coconut = False
 
     if configs.coconut:
-        model = Coconut(model, latent_id, start_id, end_id, tokenizer.eos_token_id)
+        model = Coconut(model, latent_id, start_id, end_id, tokenizer.eos_token_id,
+                        disable_kv_cache=getattr(configs, "disable_kv_cache", False))
 
     if configs.load_model_path != "None" and not loaded:
         # At this point, a Coconut-wrapped checkpoint should be loaded into the wrapper
@@ -302,12 +326,12 @@ def main():
     print(f"Running FSDP on rank = {rank}, world size = {world_size}")
     model = model.to(rank)
 
+    _fsdp_layer_cls = {LlamaDecoderLayer}
+    if Gemma3DecoderLayer is not None:
+        _fsdp_layer_cls.add(Gemma3DecoderLayer)
     llama_auto_wrap_policy = functools.partial(
         transformer_auto_wrap_policy,
-        transformer_layer_cls={
-            # GPT2Block,       # for GPT2, we don't need to shard layers (it becomes DDP)
-            LlamaDecoderLayer  # only shard llama's layers.
-        },
+        transformer_layer_cls=_fsdp_layer_cls,
     )
 
     if configs.bf16:
@@ -315,7 +339,7 @@ def main():
 
     # Use DDP if specified in config or for eval, otherwise use FSDP
     if configs.only_eval or getattr(configs, 'use_ddp', False):
-        parallel_model = DDP(model, device_ids=[rank])
+        parallel_model = DDP(model, device_ids=[rank], find_unused_parameters=True)
         print(f"Using DDP on rank {rank}")
     else:
         parallel_model = FSDP(
@@ -360,6 +384,7 @@ def main():
         tokenizer,
         max_size=max_eval_size,
         use_chat_template=use_chat_template,
+        answer_prefix=getattr(configs, "answer_prefix", "In summary, "),
     )
     if len(base_dataset_valid) == 0:
         raise ValueError(
@@ -382,6 +407,7 @@ def main():
             tokenizer,
             max_size=max_train_size,
             use_chat_template=use_chat_template,
+            answer_prefix=getattr(configs, "answer_prefix", "In summary, "),
         )
 
     if getattr(configs, "max_new_tokens", None) is not None:
@@ -624,11 +650,9 @@ def main():
 
         enable_gen_eval = getattr(configs, "enable_gen_eval", False)
         cor = torch.tensor(0, device=rank)
-        cor_cot = torch.tensor(0, device=rank)
         total = torch.tensor(0, device=rank)
-        cot_token_sum = torch.tensor(0, device=rank, dtype=torch.long)
+        gen_token_sum = torch.tensor(0, device=rank, dtype=torch.long)
         accuracy = 0.0
-        cot_match = 0.0
 
         if enable_gen_eval:
             total_length = len(valid_gen_dataloader)
@@ -648,7 +672,6 @@ def main():
 
                     assert len(batch["input_ids"]) == 1
                     answer = answers_val[test_idx.cpu().item()]
-                    answer_cot = cot_val[test_idx.cpu().item()]
                     question = question_val[test_idx.cpu().item()]
 
                     total += 1
@@ -676,9 +699,10 @@ def main():
                     default_extracted_answer = (
                         text_output.split("#")[-1].replace(",", "").strip()
                     )
-                    cot_output = text_output.split("\nassistant\n")[-1]
-                    cot_output_tokenized = tokenizer.encode(cot_output)
-                    cot_token_sum += len(cot_output_tokenized)
+                    input_ids = batch["input_ids"][0]
+                    num_latent = (input_ids == latent_id).sum().item()
+                    gen_len = len(outputs[0]) - len(input_ids)
+                    gen_token_sum += gen_len
 
                     use_boxed = getattr(configs, "use_boxed_answer", True)
                     boxed_extracted = (
@@ -710,26 +734,23 @@ def main():
                             "idx": test_idx.cpu().item(),
                             "question": question,
                             "ground_truth_answer": answer,
-                            "ground_truth_cot": answer_cot,
                             "generated_output": text_output,
                             "extracted_answer": answer_output,
                             "boxed_extracted_answer": boxed_extracted,
-                            "extracted_cot": cot_output,
                             "answer_correct": ans_correct,
-                            "cot_match": cot_output == answer_cot,
-                            "num_cot_tokens": len(cot_output_tokenized),
+                            "num_latent_tokens": num_latent,
+                            "gen_tokens": gen_len,
                         }
                     )
 
                     if idx < 5 and rank == 0:
                         print(
-                            f"Question {test_idx}: Answer = '{answer}' CoT = '{answer_cot}'"
+                            f"Question {test_idx}: Answer = '{answer}'"
                         )
                         print(f"Full output: '{tokenizer.decode(outputs[0])}'")
                         print(f"Extracted Output: '{answer_output}'")
 
                     cor += 1 if ans_correct else 0
-                    cor_cot += cot_output == answer_cot
 
                     pbar.update(1)
                     pbar.set_description(
@@ -737,31 +758,25 @@ def main():
                     )
 
                 pbar.close()
-                print(f"Device {rank}: Cor={cor}, CoT={cor_cot}, Total={total}")
+                print(f"Device {rank}: Cor={cor}, Total={total}")
 
-            dist.all_reduce(cor_cot, op=dist.ReduceOp.SUM)
             dist.all_reduce(cor, op=dist.ReduceOp.SUM)
             dist.all_reduce(total, op=dist.ReduceOp.SUM)
-            dist.all_reduce(cot_token_sum, op=dist.ReduceOp.SUM)
+            dist.all_reduce(gen_token_sum, op=dist.ReduceOp.SUM)
 
-            cor_cot = cor_cot.item()
             cor = cor.item()
             total = total.item()
-            cot_sum = cot_token_sum.item()
+            gen_sum = gen_token_sum.item()
             if rank == 0:
                 accuracy = cor / total if total > 0 else 0
-                cot_match = cor_cot / total if total > 0 else 0
+                avg_gen_tokens = (gen_sum / total) if total > 0 else 0
                 print(f"Accuracy on validation set: {cor} / {total} = {accuracy}")
-                print(f"CoT match on validation set: {cor_cot} / {total} = {cot_match}")
-                avg_cot_tokens = (cot_sum / total) if total > 0 else 0
-                # Final concise eval summary
-                print(f"Eval summary -> accuracy: {accuracy:.4f}, samples: {total}, avg_cot_tokens: {avg_cot_tokens:.2f}")
+                print(f"Eval summary -> accuracy: {accuracy:.4f}, samples: {total}, avg_gen_tokens: {avg_gen_tokens:.2f}")
             sys.stdout.flush()
             if wandb_run:
-                wandb_run.log({"eval/acc": accuracy, "eval/cot_em": cot_match})
+                wandb_run.log({"eval/acc": accuracy})
         else:
             cor = 0
-            cor_cot = 0
             total = 0
             if rank == 0:
                 print("Skipping generation eval (enable_gen_eval=False).")
@@ -785,11 +800,9 @@ def main():
             if outputs_to_save:
                 deduped_total = len(outputs_to_save)
                 deduped_cor = sum(1 for e in outputs_to_save if e["answer_correct"])
-                deduped_cot = sum(1 for e in outputs_to_save if e["cot_match"])
             else:
                 deduped_total = total
                 deduped_cor = cor
-                deduped_cot = cor_cot
 
             output_file = os.path.join(save_dir, "eval_outputs.json")
             with open(output_file, "w") as f:
@@ -797,10 +810,8 @@ def main():
                     "config": config_dict,
                     "checkpoint": configs.load_model_path,
                     "accuracy": deduped_cor / deduped_total if deduped_total > 0 else 0,
-                    "cot_exact_match": deduped_cot / deduped_total if deduped_total > 0 else 0,
                     "total_samples": deduped_total,
                     "correct_answers": deduped_cor,
-                    "cot_matches": deduped_cot,
                     "outputs": outputs_to_save if outputs_to_save is not None else eval_outputs
                 }, f, indent=2)
             print(f"\n✓ Saved evaluation outputs to: {output_file}")

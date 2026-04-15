@@ -1,0 +1,237 @@
+{
+  "generated_on": "2026-04-14",
+  "author_namespace": "agurung",
+  "default_local_profile": "balanced_local",
+  "default_archive_profile": "conservative_archive",
+  "profiles": {
+    "balanced_local": {
+      "description": "Checkpoint subset to keep on local disk after exact HF archival is complete."
+    },
+    "conservative_archive": {
+      "description": "Checkpoint superset worth exporting to HF for long-term recovery and curve reconstruction."
+    }
+  },
+  "selection_basis": [
+    "preserve checkpoints explicitly used in downstream eval or row-recompute scripts",
+    "preserve checkpoints that anchor major performance transitions in recorded sweeps",
+    "preserve final or exported checkpoints that already back local aliases or HF exports"
+  ],
+  "runs": [
+    {
+      "path": "checkpoints/qwen3-coconut-ff-v3",
+      "label": "Qwen3 Coconut FF v3",
+      "kind": "standard_ff",
+      "keep": [
+        {
+          "name": "checkpoint_24",
+          "profiles": [
+            "balanced_local",
+            "conservative_archive"
+          ],
+          "reason": "Late-stage standard FF checkpoint present in the recorded val and test summaries."
+        },
+        {
+          "name": "checkpoint_32",
+          "profiles": [
+            "conservative_archive"
+          ],
+          "reason": "Final standard FF checkpoint and exact HF-backed export."
+        }
+      ],
+      "notes": [
+        "Only checkpoint_24 and checkpoint_32 still exist locally."
+      ],
+      "hf_target": {
+        "existing_repo": "agurung/coconut-qwen3-4b-ff",
+        "suggested_repo": "agurung/coconut-qwen3-4b-ff"
+      }
+    },
+    {
+      "path": "checkpoints/gemma/gemma3-coconut-ff-v3",
+      "label": "Gemma 3 4B Coconut FF v3",
+      "kind": "standard_ff",
+      "keep": [
+        {
+          "name": "checkpoint_32",
+          "profiles": [
+            "conservative_archive"
+          ],
+          "reason": "Final standard FF checkpoint, exact HF-backed export, and the only locally present raw checkpoint for this run."
+        }
+      ],
+      "notes": [
+        "checkpoint_32 is the only raw checkpoint still present locally."
+      ],
+      "hf_target": {
+        "existing_repo": "agurung/coconut-gemma-3-4b-ff",
+        "suggested_repo": "agurung/coconut-gemma-3-4b-ff"
+      }
+    },
+    {
+      "path": "checkpoints/qwen3-coconut-ff-reward-filtered-v1-2gpu",
+      "label": "Qwen3 Coconut FF Reward-Filtered v1 2-GPU",
+      "kind": "reward_filtered_ff",
+      "keep": [
+        {
+          "name": "checkpoint_20",
+          "profiles": [
+            "balanced_local",
+            "conservative_archive"
+          ],
+          "reason": "Used in the March 31 row-recompute pipeline and successful 4-shard rerun."
+        },
+        {
+          "name": "checkpoint_22",
+          "profiles": [
+            "conservative_archive"
+          ],
+          "reason": "Explicitly evaluated on March 27 and preserves the remembered mid-run checkpoint choice."
+        },
+        {
+          "name": "checkpoint_24",
+          "profiles": [
+            "balanced_local",
+            "conservative_archive"
+          ],
+          "reason": "First major jump checkpoint in the recorded validation and test results."
+        },
+        {
+          "name": "checkpoint_26",
+          "profiles": [
+            "conservative_archive"
+          ],
+          "reason": "High-performing late-stage checkpoint with explicit March 27 test outputs."
+        },
+        {
+          "name": "checkpoint_32",
+          "profiles": [
+            "balanced_local",
+            "conservative_archive"
+          ],
+          "reason": "Final late-stage checkpoint; tied best validation checkpoint and best tested late checkpoint."
+        }
+      ],
+      "alternates": [
+        {
+          "name": "checkpoint_16",
+          "reason": "Best pre-jump turning-point checkpoint if you prefer broader curve coverage over preserving checkpoint_22."
+        }
+      ],
+      "notes": [
+        "Validation sweep outputs exist for checkpoint_8 and checkpoint_12, but those raw checkpoints are already missing locally."
+      ],
+      "hf_target": {
+        "existing_repo": null,
+        "suggested_repo": "agurung/coconut-qwen3-4b-ff-reward-filtered",
+        "related_existing_repos": [
+          "agurung/coconut-qwen3-4b-ff",
+          "agurung/flawed-fictions-qwen3-4b",
+          "agurung/flawed-fictions-qwen3-4b-litereason"
+        ]
+      }
+    },
+    {
+      "path": "checkpoints/gemma/gemma3-coconut-ff-reward-filtered-v1-2gpu",
+      "label": "Gemma 3 4B Coconut FF Reward-Filtered v1 2-GPU",
+      "kind": "reward_filtered_ff",
+      "keep": [
+        {
+          "name": "checkpoint_20",
+          "profiles": [
+            "conservative_archive"
+          ],
+          "reason": "Early saved stage-10 checkpoint; keep because the run has only four raw checkpoints total."
+        },
+        {
+          "name": "checkpoint_24",
+          "profiles": [
+            "conservative_archive"
+          ],
+          "reason": "Mid-late saved checkpoint; keep because the run has only four raw checkpoints total."
+        },
+        {
+          "name": "checkpoint_28",
+          "profiles": [
+            "conservative_archive"
+          ],
+          "reason": "Late saved checkpoint; keep because the run has only four raw checkpoints total."
+        },
+        {
+          "name": "checkpoint_32",
+          "profiles": [
+            "balanced_local",
+            "conservative_archive"
+          ],
+          "reason": "Only reward-filtered Gemma checkpoint with explicit in-repo eval outputs."
+        }
+      ],
+      "notes": [
+        "This run only has four raw checkpoints on disk."
+      ],
+      "hf_target": {
+        "existing_repo": null,
+        "suggested_repo": "agurung/coconut-gemma-3-4b-ff-reward-filtered",
+        "related_existing_repos": [
+          "agurung/coconut-gemma-3-4b-ff",
+          "agurung/flawed-fictions-gemma-3-4b"
+        ]
+      }
+    },
+    {
+      "path": "checkpoints/gsm_hard/gemma3-1b-coconut-gsm-hard",
+      "label": "Gemma 3 1B Coconut GSM-Hard",
+      "kind": "gsm_hard",
+      "keep": [
+        {
+          "name": "checkpoint_4",
+          "profiles": [
+            "balanced_local",
+            "conservative_archive"
+          ],
+          "reason": "Best checkpoint in the recorded GSM-Hard validation sweep."
+        },
+        {
+          "name": "checkpoint_8",
+          "profiles": [
+            "conservative_archive"
+          ],
+          "reason": "Early-stage checkpoint that preserves the declining part of the validation curve."
+        },
+        {
+          "name": "checkpoint_12",
+          "profiles": [
+            "conservative_archive"
+          ],
+          "reason": "Last checkpoint before the run collapses to near-zero validation accuracy."
+        },
+        {
+          "name": "checkpoint_24",
+          "profiles": [
+            "balanced_local",
+            "conservative_archive"
+          ],
+          "reason": "Best late-stage non-zero checkpoint in the recorded validation sweep."
+        },
+        {
+          "name": "checkpoint_32",
+          "profiles": [
+            "balanced_local",
+            "conservative_archive"
+          ],
+          "reason": "Final checkpoint used by downstream row-recompute scripts and the local materialized export."
+        }
+      ],
+      "notes": [
+        "The recorded validation sweep favors early checkpoints, but downstream tooling and the local standard export both point at checkpoint_32."
+      ],
+      "hf_target": {
+        "existing_repo": null,
+        "suggested_repo": "agurung/coconut-gemma-3-1b-gsm-hard",
+        "related_existing_repos": [
+          "agurung/colar-gemma-3-1b-gsm-hard-sft",
+          "agurung/colar-gemma-3-1b-gsm-hard-rl"
+        ]
+      }
+    }
+  ]
+}

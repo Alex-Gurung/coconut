@@ -21,6 +21,7 @@ class Coconut(nn.Module):
         start_latent_id,
         end_latent_id,
         eos_token_id,
+        disable_kv_cache=False,
     ):
 
         super(Coconut, self).__init__()
@@ -30,6 +31,7 @@ class Coconut(nn.Module):
         self.eos_token_id = eos_token_id
         self.start_latent_id = start_latent_id
         self.end_latent_id = end_latent_id
+        self.disable_kv_cache = disable_kv_cache
 
         # tested with GPT2 and Llama3
         if isinstance(self.base_causallm, GPT2LMHeadModel):
@@ -65,23 +67,28 @@ class Coconut(nn.Module):
 
         for pass_idx in range(max_n_latents):
 
-            if kv_cache == None:
-                # first forward pass
+            full_recompute = self.disable_kv_cache or kv_cache is None
+
+            if full_recompute:
+                # Full recompute from position 0. Required when kv cache is
+                # disabled (e.g. for sliding-window models like Gemma 3), on
+                # the very first pass, or when training disables cache returns
+                # (e.g. gradient checkpointing).
                 outputs = self.base_causallm(
                     inputs_embeds=inputs_embeds[
-                        :, next_compute_range[0] : next_compute_range[1], :
+                        :, : next_compute_range[1], :
                     ],
                     attention_mask=attention_mask[
-                        :, next_compute_range[0] : next_compute_range[1]
+                        :, : next_compute_range[1]
                     ],
                     position_ids=position_ids[
-                        :, next_compute_range[0] : next_compute_range[1]
+                        :, : next_compute_range[1]
                     ],
                     token_type_ids=(
                         None
                         if token_type_ids is None
                         else token_type_ids[
-                            :, next_compute_range[0] : next_compute_range[1]
+                            :, : next_compute_range[1]
                         ]
                     ),
                     output_hidden_states=True,
@@ -127,7 +134,12 @@ class Coconut(nn.Module):
                 # in `outputs.hidden_states`, [0, k) will be skipped
                 # so we need to keep this offset to correctly use the last hidden states
 
-            logits.append(outputs.logits)
+            if full_recompute and pass_idx > 0:
+                # Full recompute produces logits for [0, end) but we only
+                # need the new token's logits to avoid duplicates.
+                logits.append(outputs.logits[:, next_compute_range[0]:, :])
+            else:
+                logits.append(outputs.logits)
 
             next_compute_range = (
                 next_compute_range[1],
@@ -141,7 +153,8 @@ class Coconut(nn.Module):
             hidden_states = outputs.hidden_states[
                 -1
             ]  # Get the last layer hidden states
-            kv_cache = outputs.past_key_values
+            if not self.disable_kv_cache:
+                kv_cache = outputs.past_key_values
 
             # feedback the continuous thoughts to the input_embeds
 
@@ -188,10 +201,14 @@ class Coconut(nn.Module):
             )
 
         # final pass
-        if kv_cache and isinstance(kv_cache, Cache):
+        if self.disable_kv_cache or not kv_cache:
+            past_key_values = None
+            final_start = 0
+        elif isinstance(kv_cache, Cache):
             past_key_values = kv_cache
             past_key_values.crop(next_compute_range[0])
-        elif kv_cache:
+            final_start = next_compute_range[0]
+        else:
             past_key_values = tuple(
                 (
                     k[:, :, : next_compute_range[0], :],
@@ -199,25 +216,27 @@ class Coconut(nn.Module):
                 )
                 for k, v in kv_cache
             )
-        else:
-            past_key_values = None
+            final_start = next_compute_range[0]
 
         outputs = self.base_causallm(
             inputs_embeds=inputs_embeds[
-                :, next_compute_range[0] : next_compute_range[1], :
+                :, final_start : next_compute_range[1], :
             ],
             attention_mask=attention_mask[:, : next_compute_range[1]],
-            position_ids=position_ids[:, next_compute_range[0] : next_compute_range[1]],
+            position_ids=position_ids[:, final_start : next_compute_range[1]],
             token_type_ids=(
                 None
                 if token_type_ids is None
-                else token_type_ids[:, next_compute_range[0] : next_compute_range[1]]
+                else token_type_ids[:, final_start : next_compute_range[1]]
             ),
             past_key_values=past_key_values,
             output_hidden_states=True,
         )
 
-        logits.append(outputs.logits)
+        if final_start == 0 and max_n_latents > 0:
+            logits.append(outputs.logits[:, next_compute_range[0]:, :])
+        else:
+            logits.append(outputs.logits)
 
         self.gen_forward_cnt += max_n_latents + 1
 
