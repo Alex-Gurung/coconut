@@ -12,8 +12,46 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from huggingface_hub import HfApi, create_repo
+if TYPE_CHECKING:
+    from huggingface_hub import HfApi
+
+
+PROTECTED_REMOTE_FILES = {".gitattributes"}
+
+
+def list_local_relative_files(model_dir: Path) -> set[str]:
+    return {
+        path.relative_to(model_dir).as_posix()
+        for path in model_dir.rglob("*")
+        if path.is_file()
+    }
+
+
+def compute_delete_patterns(
+    api: HfApi,
+    repo_id: str,
+    model_dir: Path,
+    revision: str | None,
+) -> list[str]:
+    local_files = list_local_relative_files(model_dir)
+    try:
+        remote_files = set(
+            api.list_repo_files(
+                repo_id,
+                repo_type="model",
+                revision=revision,
+            )
+        )
+    except Exception:
+        return []
+
+    return sorted(
+        remote_file
+        for remote_file in remote_files
+        if remote_file not in local_files and remote_file not in PROTECTED_REMOTE_FILES
+    )
 
 
 def upload_model_to_hf(
@@ -25,6 +63,7 @@ def upload_model_to_hf(
     tag: str | None = None,
     commit_message: str | None = None,
     replace_tag: bool = True,
+    replace_branch_contents: bool = True,
 ) -> dict | None:
     """
     Upload a prepared model directory to Hugging Face Hub.
@@ -41,6 +80,8 @@ def upload_model_to_hf(
     else:
         print(f"Uploading model to: https://huggingface.co/{repo_id}")
     print(f"Model directory: {model_dir_path}")
+
+    from huggingface_hub import HfApi, create_repo
 
     api = HfApi()
 
@@ -59,12 +100,30 @@ def upload_model_to_hf(
         api.create_branch(repo_id, branch=revision, exist_ok=True)
         print(f"Branch ready: {revision}")
 
+    delete_patterns = []
+    if replace_branch_contents:
+        delete_patterns = compute_delete_patterns(
+            api=api,
+            repo_id=repo_id,
+            model_dir=model_dir_path,
+            revision=revision,
+        )
+        if delete_patterns:
+            preview = ", ".join(delete_patterns[:5])
+            if len(delete_patterns) > 5:
+                preview += ", ..."
+            print(
+                "Deleting stale remote files before upload: "
+                f"{len(delete_patterns)} ({preview})"
+            )
+
     commit = api.upload_folder(
         folder_path=str(model_dir_path),
         repo_id=repo_id,
         repo_type="model",
         revision=revision,
         commit_message=commit_message or f"Upload {model_dir_path.name}",
+        delete_patterns=delete_patterns or None,
     )
 
     target_revision = revision or commit.oid
@@ -100,6 +159,7 @@ def upload_model_to_hf(
         "commit_oid": commit.oid,
         "commit_url": commit.commit_url,
         "tag": tag,
+        "delete_patterns": delete_patterns,
     }
 
 
@@ -112,6 +172,11 @@ def main() -> None:
     parser.add_argument("--revision", help="Branch/revision name such as checkpoint_24")
     parser.add_argument("--tag", help="Optional stable tag such as checkpoint-24")
     parser.add_argument("--commit-message", help="Optional upload commit message")
+    parser.add_argument(
+        "--preserve-remote-files",
+        action="store_true",
+        help="Do not delete remote-only files before uploading this directory.",
+    )
     args = parser.parse_args()
 
     result = upload_model_to_hf(
@@ -123,6 +188,7 @@ def main() -> None:
         tag=args.tag,
         commit_message=args.commit_message,
         replace_tag=True,
+        replace_branch_contents=not args.preserve_remote_files,
     )
     if result is None:
         raise SystemExit(1)
