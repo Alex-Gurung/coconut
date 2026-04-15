@@ -1,6 +1,7 @@
-# Example eval config (copy to args/my_eval.yaml and edit)
+# Generic example eval config.
+# Prefer experiments/gsm_hard_qwen3_4b/eval.yaml for the main repo workflow.
 project: coconut
-save_path: /mnt/disk/coconut/checkpoints
+save_path: checkpoints
 name: example-eval
 
 # Eval mode
@@ -13,7 +14,7 @@ bf16: true
 
 # Model + checkpoint to evaluate
 model_id: Qwen/Qwen3-4B-Instruct-2507
-load_model_path: /mnt/disk/coconut/checkpoints/example-train/checkpoint_14
+load_model_path: checkpoints/example-train/checkpoint_14
 resume: 14               # keep aligned with checkpoint epoch for stage schedule
 latent_init_token: "<<"
 
@@ -29,8 +30,8 @@ pad_latent_to_max: true
 uniform_prob: 0.0
 
 # Data
-train_path: ff_data/train.json
-val_path: ff_data/val.json
+train_path: gsm_hard_data/qwen3_4b/train.json
+val_path: gsm_hard_data/qwen3_4b/val.json
 use_chat_template: true
 
 # Eval behavior

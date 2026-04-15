@@ -62,7 +62,7 @@ def main() -> None:
     parser.add_argument("--checkpoints", default=None,
                         help="Comma-separated checkpoint ids to eval (e.g. '8,16,24,32'). Default: all.")
     parser.add_argument("--val-path", default=None,
-                        help="Override val_path in config (e.g. ff_data/val_litereason.json).")
+                        help="Override val_path in config (e.g. gsm_hard_data/qwen3_4b/val.json).")
     parser.add_argument("--eval-suffix", default=None,
                         help="Suffix appended to eval directory names (e.g. 'test' -> *-eval-ckpt_004-test).")
     parser.add_argument("--skip-existing", action="store_true",

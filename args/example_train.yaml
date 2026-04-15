@@ -1,6 +1,7 @@
-# Example training config (copy to args/my_train.yaml and edit)
+# Generic example training config.
+# Prefer experiments/gsm_hard_qwen3_4b/train.yaml for the main repo workflow.
 project: coconut
-save_path: /mnt/disk/coconut/checkpoints
+save_path: checkpoints
 name: example-train
 
 # Core mode
@@ -29,8 +30,8 @@ pad_latent_to_max: true
 uniform_prob: 0.0
 
 # Data
-train_path: ff_data/train.json
-val_path: ff_data/val.json
+train_path: gsm_hard_data/qwen3_4b/train.json
+val_path: gsm_hard_data/qwen3_4b/val.json
 use_chat_template: true
 
 # Training

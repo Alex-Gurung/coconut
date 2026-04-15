@@ -37,7 +37,7 @@ python scripts/eval/run_eval_n_times.py checkpoints/my-model 4 --val-path data/m
 
 ### Options
 
-- `--config-base`: Base config file to use as template (default: `args/qwen3_ff_coconut_strict_eval.yaml`)
+- `--config-base`: Base config file to use as template (default: `experiments/gsm_hard_qwen3_4b/eval.yaml`)
 - `--name`: Name for the eval run (default: derived from checkpoint/model name)
 - `--val-path`: Path to validation/test data
 - `--num-gpus`: Number of GPUs to use with torchrun (default: 4)

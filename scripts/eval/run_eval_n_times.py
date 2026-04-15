@@ -4,16 +4,16 @@ Run evaluation across checkpoints and/or seeds, parallelized across GPUs.
 
 Modes:
   Directory mode — evaluate every checkpoint_* in a directory:
-    python scripts/eval/run_eval_n_times.py checkpoints/my-run/ --config-base args/eval.yaml --num-gpus 4
+    python scripts/eval/run_eval_n_times.py checkpoints/gsm_hard/qwen3-4b-coconut-gsm-hard/ --config-base experiments/gsm_hard_qwen3_4b/eval.yaml --num-gpus 4
 
   Single checkpoint, multiple seeds:
-    python scripts/eval/run_eval_n_times.py checkpoints/my-run/checkpoint_14 5 --config-base args/eval.yaml --num-gpus 4
+    python scripts/eval/run_eval_n_times.py checkpoints/gsm_hard/qwen3-4b-coconut-gsm-hard/checkpoint_20 5 --config-base experiments/gsm_hard_qwen3_4b/eval.yaml --num-gpus 4
 
   Directory + multiple seeds per checkpoint:
-    python scripts/eval/run_eval_n_times.py checkpoints/my-run/ 3 --config-base args/eval.yaml --num-gpus 4
+    python scripts/eval/run_eval_n_times.py checkpoints/gsm_hard/qwen3-4b-coconut-gsm-hard/ 3 --config-base experiments/gsm_hard_qwen3_4b/eval.yaml --num-gpus 4
 
   Quick benchmark (5 samples, 1 checkpoint):
-    python scripts/eval/run_eval_n_times.py checkpoints/my-run/checkpoint_4 --max-samples 5 --num-gpus 1
+    python scripts/eval/run_eval_n_times.py checkpoints/gsm_hard/qwen3-4b-coconut-gsm-hard/checkpoint_4 --max-samples 5 --num-gpus 1
 
 The `resume` value is automatically set to the checkpoint epoch number so the
 correct latent stage is used (critical for coconut models).
@@ -80,7 +80,7 @@ def main():
         help="Seeds per checkpoint (default: 1)",
     )
     parser.add_argument(
-        "--config-base", default="args/qwen3_ff_coconut_strict_eval.yaml",
+        "--config-base", default="experiments/gsm_hard_qwen3_4b/eval.yaml",
         help="Base config file to use as template",
     )
     parser.add_argument("--name", default=None, help="Name prefix for eval output dirs")
