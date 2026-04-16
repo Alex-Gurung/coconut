@@ -36,10 +36,28 @@ Evaluate checkpoints from the main run:
 GPUS=0,1,2,3 bash experiments/gsm_hard_qwen3_4b/eval_all.sh
 ```
 
+Evaluate one saved checkpoint:
+
+```bash
+CHECKPOINT=4 GPUS=0 bash experiments/gsm_hard_qwen3_4b/eval_one.sh
+```
+
 List the saved checkpoints before launching the sweep:
 
 ```bash
 LIST_ONLY=1 bash experiments/gsm_hard_qwen3_4b/eval_all.sh
+```
+
+Print the current eval summary as a terminal table:
+
+```bash
+bash experiments/gsm_hard_qwen3_4b/show_summary.sh
+```
+
+If you need to force a particular interpreter, for example `/tmp/.venv`, use:
+
+```bash
+PYTHON_BIN=/tmp/.venv/bin/python bash experiments/gsm_hard_qwen3_4b/show_summary.sh
 ```
 
 ## Setup

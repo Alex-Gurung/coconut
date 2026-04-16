@@ -29,7 +29,9 @@ Each file should contain rows shaped like:
 - `eval.yaml`: manual single-checkpoint eval template
 - `train.sh`: wrapper for the main train config
 - `smoke.sh`: wrapper for the smoke config
+- `eval_one.sh`: wrapper for evaluating one saved checkpoint
 - `eval_all.sh`: wrapper around `scripts/eval_checkpoints.py`
+- `show_summary.sh`: print the current eval summary as a terminal table
 - `UPSTREAM_NOTES.md`: why this workflow differs from original Coconut
 
 ## Train
@@ -85,7 +87,7 @@ GPUS=0,1,2,3 bash experiments/gsm_hard_qwen3_4b/eval_all.sh
 Evaluate a specific checkpoint:
 
 ```bash
-GPUS=0 CHECKPOINTS=4 bash experiments/gsm_hard_qwen3_4b/eval_all.sh
+CHECKPOINT=4 GPUS=0 bash experiments/gsm_hard_qwen3_4b/eval_one.sh
 ```
 
 Re-run the sweep while reusing existing `eval_outputs.json` results:
@@ -101,6 +103,39 @@ checkpoints/gsm_hard/<run-name>-eval-ckpt_XXX/eval_outputs.json
 checkpoints/gsm_hard/<run-name>/eval_summary.json
 checkpoints/gsm_hard/<run-name>/eval_summary.md
 ```
+
+Every `eval_all.sh` or `eval_one.sh` run refreshes the run-level summary from
+all matching `eval_outputs.json` directories already on disk, so evaluating one
+new checkpoint does not collapse `eval_summary.json` down to a single row.
+
+Print the current summary as a terminal table:
+
+```bash
+bash experiments/gsm_hard_qwen3_4b/show_summary.sh
+```
+
+If you want to force the wrapper to use a specific interpreter, for example the
+venv at `/tmp/.venv`, set `PYTHON_BIN`:
+
+```bash
+PYTHON_BIN=/tmp/.venv/bin/python bash experiments/gsm_hard_qwen3_4b/show_summary.sh
+```
+
+Sort by accuracy instead of checkpoint order:
+
+```bash
+PYTHON_BIN=/tmp/.venv/bin/python SORT=accuracy bash experiments/gsm_hard_qwen3_4b/show_summary.sh
+```
+
+Force the table script to rescan the eval directories instead of loading the
+saved `eval_summary.json`:
+
+```bash
+PYTHON_BIN=/tmp/.venv/bin/python REFRESH=1 bash experiments/gsm_hard_qwen3_4b/show_summary.sh
+```
+
+`show_summary.sh` uses the `rich` Python package for terminal tables. It is
+included in `requirements.txt`.
 
 ## Manual Single-Checkpoint Eval
 

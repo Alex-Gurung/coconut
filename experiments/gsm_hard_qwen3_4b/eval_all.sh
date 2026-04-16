@@ -5,11 +5,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CONFIG="${CONFIG:-$ROOT_DIR/experiments/gsm_hard_qwen3_4b/train.yaml}"
 GPUS="${GPUS:-0}"
 TORCHRUN="${TORCHRUN:-torchrun}"
+PYTHON_BIN="${PYTHON_BIN:-python}"
 
 cd "$ROOT_DIR"
 
 CMD=(
-  python
+  "$PYTHON_BIN"
   scripts/eval_checkpoints.py
   --train-config "$CONFIG"
   --gpus "$GPUS"

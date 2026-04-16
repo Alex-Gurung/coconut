@@ -7,15 +7,16 @@ import time
 from pathlib import Path
 import yaml
 
+from eval_summary_utils import (
+    checkpoint_id,
+    collect_result,
+    discover_eval_results,
+    format_eval_suffix,
+    pretty_md,
+    summary_basename,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-
-
-def _checkpoint_id(name: str) -> int:
-    try:
-        return int(name.split("_")[-1])
-    except Exception:
-        return -1
 
 
 def _load_yaml(path: str) -> dict:
@@ -32,25 +33,8 @@ def _find_checkpoints(save_dir: str) -> list[str]:
     if not os.path.isdir(save_dir):
         return []
     ckpts = [f for f in os.listdir(save_dir) if f.startswith("checkpoint_")]
-    ckpts = sorted(ckpts, key=_checkpoint_id)
+    ckpts = sorted(ckpts, key=checkpoint_id)
     return ckpts
-
-
-def _latent_stage(epoch: int, epochs_per_stage: int, max_latent_stage: int) -> int:
-    return min(epoch // epochs_per_stage, max_latent_stage)
-
-
-def _pretty_md(rows: list[dict]) -> str:
-    header = "| checkpoint | stage | latents | accuracy | avg_gen_tokens | samples |"
-    sep = "|---|---|---|---|---|---|"
-    lines = [header, sep]
-    for row in rows:
-        lines.append(
-            f"| {row['checkpoint']} | {row['stage']} | {row['num_latents']}"
-            f" | {row['accuracy']:.4f}"
-            f" | {row['avg_gen_tokens']:.1f} | {row['samples']} |"
-        )
-    return "\n".join(lines) + "\n"
 
 
 def main() -> None:
@@ -83,7 +67,7 @@ def main() -> None:
 
     if args.checkpoints:
         keep = {int(x.strip()) for x in args.checkpoints.split(",")}
-        checkpoints = [c for c in checkpoints if _checkpoint_id(c) in keep]
+        checkpoints = [c for c in checkpoints if checkpoint_id(c) in keep]
         if not checkpoints:
             raise SystemExit(f"None of the requested checkpoint ids found in {save_dir}")
 
@@ -106,53 +90,32 @@ def main() -> None:
     tmp_dir = str(REPO_ROOT / "tmp")
     os.makedirs(tmp_dir, exist_ok=True)
 
-    # Helper to collect results from an eval_outputs.json
     epochs_per_stage = base_cfg.get("epochs_per_stage", 1)
     max_latent_stage = base_cfg.get("max_latent_stage", 100)
     c_thought = base_cfg.get("c_thought", 1)
 
-    def _collect_result(ckpt_name: str, ckpt_id: int, eval_dir: str) -> dict:
-        stage = _latent_stage(ckpt_id, epochs_per_stage, max_latent_stage)
-        num_latents = stage * c_thought
-        summary_path = os.path.join(eval_dir, "eval_outputs.json")
-        if os.path.exists(summary_path):
-            with open(summary_path, "r") as f:
-                payload = json.load(f)
-            outputs = payload.get("outputs", [])
-            gen_counts = [e.get("gen_tokens", e.get("num_cot_tokens", 0)) for e in outputs if e]
-            avg_gen = sum(gen_counts) / len(gen_counts) if gen_counts else 0.0
-            return {
-                "checkpoint": ckpt_name,
-                "stage": stage,
-                "num_latents": num_latents,
-                "accuracy": payload.get("accuracy", 0.0),
-                "avg_gen_tokens": avg_gen,
-                "samples": payload.get("total_samples", 0),
-                "eval_dir": eval_dir,
-            }
-        return {
-            "checkpoint": ckpt_name,
-            "stage": stage,
-            "num_latents": num_latents,
-            "accuracy": 0.0,
-            "avg_gen_tokens": 0.0,
-            "samples": 0,
-            "eval_dir": eval_dir,
-        }
-
     # Prepare jobs
     jobs = []
     existing_results = []
-    suffix = f"-{args.eval_suffix}" if args.eval_suffix else ""
+    suffix = format_eval_suffix(args.eval_suffix)
 
     for ckpt in checkpoints:
-        ckpt_id = _checkpoint_id(ckpt)
+        ckpt_id = checkpoint_id(ckpt)
         eval_name = f"{run_name}-eval-ckpt_{ckpt_id:03d}{suffix}"
         eval_dir = os.path.join(save_path, eval_name)
 
         # Skip if results already exist
         if args.skip_existing and os.path.exists(os.path.join(eval_dir, "eval_outputs.json")):
-            existing_results.append(_collect_result(ckpt, ckpt_id, eval_dir))
+            existing_results.append(
+                collect_result(
+                    eval_dir=eval_dir,
+                    ckpt_name=ckpt,
+                    ckpt_id=ckpt_id,
+                    epochs_per_stage=epochs_per_stage,
+                    max_latent_stage=max_latent_stage,
+                    c_thought=c_thought,
+                )
+            )
             print(f"Skipping {ckpt} (existing results in {eval_dir})")
             continue
 
@@ -243,7 +206,16 @@ def main() -> None:
                 print(f"Eval failed for {job['ckpt']} on GPU {gpu_id} (exit {proc.returncode}).")
             duration = time.time() - job_start
             completed_durations.append(duration)
-            results.append(_collect_result(job["ckpt"], job["ckpt_id"], job["eval_dir"]))
+            results.append(
+                collect_result(
+                    eval_dir=job["eval_dir"],
+                    ckpt_name=job["ckpt"],
+                    ckpt_id=job["ckpt_id"],
+                    epochs_per_stage=epochs_per_stage,
+                    max_latent_stage=max_latent_stage,
+                    c_thought=c_thought,
+                )
+            )
             del running[gpu_id]
             if pending:
                 launch(pending.pop(0), gpu_id)
@@ -275,21 +247,32 @@ def main() -> None:
                 else:
                     print(f"GPU {gpu_id}: idle")
 
-    # Merge existing + newly evaluated, sort by checkpoint order
-    results = existing_results + results
-    results = sorted(results, key=lambda r: _checkpoint_id(r["checkpoint"]))
-    summary_name = f"eval_summary{suffix}" if suffix else "eval_summary"
+    summary_rows = discover_eval_results(
+        save_path=save_path,
+        run_name=run_name,
+        epochs_per_stage=epochs_per_stage,
+        max_latent_stage=max_latent_stage,
+        c_thought=c_thought,
+        eval_suffix=args.eval_suffix,
+    )
+    if not summary_rows:
+        # Fall back to the in-memory results if this run did not leave any
+        # completed eval_outputs.json files on disk.
+        summary_rows = existing_results + results
+        summary_rows = sorted(summary_rows, key=lambda r: checkpoint_id(r["checkpoint"]))
+
+    summary_name = summary_basename(args.eval_suffix)
     out_base = args.out or os.path.join(save_dir, summary_name)
     with open(out_base + ".json", "w") as f:
-        json.dump(results, f, indent=2)
+        json.dump(summary_rows, f, indent=2)
     with open(out_base + ".md", "w") as f:
-        f.write(_pretty_md(results))
+        f.write(pretty_md(summary_rows))
 
     print("Evaluation summary written to:")
     print(out_base + ".json")
     print(out_base + ".md")
-    if results:
-        best = max(results, key=lambda r: r["accuracy"])
+    if summary_rows:
+        best = max(summary_rows, key=lambda r: r["accuracy"])
         print(
             f"Best checkpoint: {best['checkpoint']} (accuracy {best['accuracy']:.4f}) -> {best['eval_dir']}"
         )
