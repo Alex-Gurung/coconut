@@ -4,6 +4,7 @@ save_path: /mnt/disk/coconut/checkpoints
 name: qwen-coconut-v3-eval
 
 only_eval: True
+enable_gen_eval: True
 use_ddp: False
 torch_compile: False
 
@@ -12,6 +13,7 @@ cot: False
 no_thoughts: False
 no_cot: False
 use_chat_template: True
+answer_prefix: "In summary, "
 use_boxed_answer: False
 
 # Curriculum settings (unused during eval but kept for compatibility)

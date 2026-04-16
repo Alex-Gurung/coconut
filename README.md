@@ -8,6 +8,7 @@ for `Qwen/Qwen3-4B-Instruct-2507`.
 Start here:
 
 - [`experiments/gsm_hard_qwen3_4b/README.md`](experiments/gsm_hard_qwen3_4b/README.md)
+- [`experiments/gsm_hard_qwen3_4b/UPSTREAM_NOTES.md`](experiments/gsm_hard_qwen3_4b/UPSTREAM_NOTES.md)
 - [`experiments/gsm_hard_qwen3_4b/train.yaml`](experiments/gsm_hard_qwen3_4b/train.yaml)
 - [`experiments/gsm_hard_qwen3_4b/smoke.yaml`](experiments/gsm_hard_qwen3_4b/smoke.yaml)
 - [`experiments/gsm_hard_qwen3_4b/eval.yaml`](experiments/gsm_hard_qwen3_4b/eval.yaml)
@@ -33,6 +34,12 @@ Evaluate checkpoints from the main run:
 
 ```bash
 GPUS=0,1,2,3 bash experiments/gsm_hard_qwen3_4b/eval_all.sh
+```
+
+List the saved checkpoints before launching the sweep:
+
+```bash
+LIST_ONLY=1 bash experiments/gsm_hard_qwen3_4b/eval_all.sh
 ```
 
 ## Setup
@@ -63,5 +70,6 @@ The runtime assumes you launch commands from the repo root.
 - Flawed Fictions workflow notes now live under `docs/legacy/` and
   `args/legacy/`.
 - Checkpoint retention and recovery notes now live under `docs/archive/`.
-- For upstream comparison notes, see `docs/UPSTREAM_DIFF.md`.
+- For upstream comparison notes, see `docs/UPSTREAM_DIFF.md` and
+  `experiments/gsm_hard_qwen3_4b/UPSTREAM_NOTES.md`.
 - For the exact upstream codebase, use the local `original_coconut` branch.

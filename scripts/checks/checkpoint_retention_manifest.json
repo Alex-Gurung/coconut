@@ -1,5 +1,5 @@
 {
-  "generated_on": "2026-04-14",
+  "generated_on": "2026-04-15",
   "author_namespace": "agurung",
   "default_local_profile": "balanced_local",
   "default_archive_profile": "conservative_archive",
@@ -11,10 +11,17 @@
       "description": "Checkpoint superset worth exporting to HF for long-term recovery and curve reconstruction."
     }
   },
+  "selection_bucket_definitions": {
+    "used_elsewhere": "Checkpoint is referenced by downstream eval, row-recompute, or materialized-export workflows.",
+    "best_eval_acc": "Checkpoint is the best recorded validation/test accuracy or sits on the best late-stage accuracy plateau.",
+    "best_eval_loss_or_proxy": "Checkpoint is the best eval-loss candidate when comparable loss exists; otherwise use a proxy such as lowest avg_completion_tokens or a first-major-jump checkpoint.",
+    "last": "Final saved checkpoint for the run or the final exported/HF-backed checkpoint.",
+    "extras": "Conservative archive-only checkpoint kept for curve reconstruction, explicit historical tests, or sparse instrumentation."
+  },
   "selection_basis": [
-    "preserve checkpoints explicitly used in downstream eval or row-recompute scripts",
-    "preserve checkpoints that anchor major performance transitions in recorded sweeps",
-    "preserve final or exported checkpoints that already back local aliases or HF exports"
+    "cover the core buckets used_elsewhere, best_eval_acc, best_eval_loss_or_proxy, and last whenever local evidence exists",
+    "use a proxy metric or explicit transition checkpoint when comparable eval_loss is not recorded for the run",
+    "treat additional curve anchors or historically tested checkpoints as conservative archive-only extras"
   ],
   "runs": [
     {
@@ -28,15 +35,26 @@
             "balanced_local",
             "conservative_archive"
           ],
-          "reason": "Late-stage standard FF checkpoint present in the recorded val and test summaries."
+          "buckets": [
+            "best_eval_acc",
+            "best_eval_loss_or_proxy"
+          ],
+          "reason": "Late-stage co-best standard FF checkpoint present in the recorded val and test summaries."
         },
         {
           "name": "checkpoint_32",
           "profiles": [
             "conservative_archive"
           ],
+          "buckets": [
+            "last"
+          ],
           "reason": "Final standard FF checkpoint and exact HF-backed export."
         }
+      ],
+      "bucket_notes": [
+        "checkpoint_24 and checkpoint_32 are the only raw checkpoints still present locally.",
+        "The late-stage summaries effectively reduce this run to best/tie plus last; balanced_local keeps checkpoint_24 locally and leaves checkpoint_32 in archive only."
       ],
       "notes": [
         "Only checkpoint_24 and checkpoint_32 still exist locally."
@@ -56,8 +74,16 @@
           "profiles": [
             "conservative_archive"
           ],
+          "buckets": [
+            "best_eval_acc",
+            "best_eval_loss_or_proxy",
+            "last"
+          ],
           "reason": "Final standard FF checkpoint, exact HF-backed export, and the only locally present raw checkpoint for this run."
         }
+      ],
+      "bucket_notes": [
+        "checkpoint_32 is the only surviving raw checkpoint, so it carries every core bucket that still has local evidence."
       ],
       "notes": [
         "checkpoint_32 is the only raw checkpoint still present locally."
@@ -78,12 +104,18 @@
             "balanced_local",
             "conservative_archive"
           ],
+          "buckets": [
+            "used_elsewhere"
+          ],
           "reason": "Used in the March 31 row-recompute pipeline and successful 4-shard rerun."
         },
         {
           "name": "checkpoint_22",
           "profiles": [
             "conservative_archive"
+          ],
+          "buckets": [
+            "extras"
           ],
           "reason": "Explicitly evaluated on March 27 and preserves the remembered mid-run checkpoint choice."
         },
@@ -93,12 +125,18 @@
             "balanced_local",
             "conservative_archive"
           ],
-          "reason": "First major jump checkpoint in the recorded validation and test results."
+          "buckets": [
+            "best_eval_loss_or_proxy"
+          ],
+          "reason": "First major jump checkpoint and the first checkpoint on the lowest avg_completion_tokens plateau."
         },
         {
           "name": "checkpoint_26",
           "profiles": [
             "conservative_archive"
+          ],
+          "buckets": [
+            "extras"
           ],
           "reason": "High-performing late-stage checkpoint with explicit March 27 test outputs."
         },
@@ -108,7 +146,11 @@
             "balanced_local",
             "conservative_archive"
           ],
-          "reason": "Final late-stage checkpoint; tied best validation checkpoint and best tested late checkpoint."
+          "buckets": [
+            "best_eval_acc",
+            "last"
+          ],
+          "reason": "Final late-stage checkpoint on the tied-best validation plateau."
         }
       ],
       "alternates": [
@@ -116,6 +158,10 @@
           "name": "checkpoint_16",
           "reason": "Best pre-jump turning-point checkpoint if you prefer broader curve coverage over preserving checkpoint_22."
         }
+      ],
+      "bucket_notes": [
+        "Comparable eval_loss is not recorded cleanly for this run, so best_eval_loss_or_proxy uses the first major jump / low-length plateau checkpoint.",
+        "checkpoint_20, checkpoint_24, and checkpoint_32 are the minimal balanced_local trio that cover used_elsewhere, proxy-loss, and best-acc-plus-last."
       ],
       "notes": [
         "Validation sweep outputs exist for checkpoint_8 and checkpoint_12, but those raw checkpoints are already missing locally."
@@ -140,21 +186,30 @@
           "profiles": [
             "conservative_archive"
           ],
-          "reason": "Early saved stage-10 checkpoint; keep because the run has only four raw checkpoints total."
+          "buckets": [
+            "extras"
+          ],
+          "reason": "Early saved stage-10 checkpoint retained as conservative curve coverage."
         },
         {
           "name": "checkpoint_24",
           "profiles": [
             "conservative_archive"
           ],
-          "reason": "Mid-late saved checkpoint; keep because the run has only four raw checkpoints total."
+          "buckets": [
+            "extras"
+          ],
+          "reason": "Mid-late saved checkpoint retained as conservative curve coverage."
         },
         {
           "name": "checkpoint_28",
           "profiles": [
             "conservative_archive"
           ],
-          "reason": "Late saved checkpoint; keep because the run has only four raw checkpoints total."
+          "buckets": [
+            "extras"
+          ],
+          "reason": "Late saved checkpoint retained because the run is already small and sparsely instrumented."
         },
         {
           "name": "checkpoint_32",
@@ -162,8 +217,16 @@
             "balanced_local",
             "conservative_archive"
           ],
-          "reason": "Only reward-filtered Gemma checkpoint with explicit in-repo eval outputs."
+          "buckets": [
+            "best_eval_acc",
+            "best_eval_loss_or_proxy",
+            "last"
+          ],
+          "reason": "Only reward-filtered Gemma checkpoint with explicit in-repo eval outputs and the final saved checkpoint."
         }
+      ],
+      "bucket_notes": [
+        "This run is sparsely instrumented: checkpoint_32 is the only checkpoint with explicit in-repo eval outputs, so it carries the core buckets and the earlier checkpoints remain archive-only extras."
       ],
       "notes": [
         "This run only has four raw checkpoints on disk."
@@ -188,6 +251,9 @@
             "balanced_local",
             "conservative_archive"
           ],
+          "buckets": [
+            "best_eval_acc"
+          ],
           "reason": "Best checkpoint in the recorded GSM-Hard validation sweep."
         },
         {
@@ -195,12 +261,18 @@
           "profiles": [
             "conservative_archive"
           ],
+          "buckets": [
+            "extras"
+          ],
           "reason": "Early-stage checkpoint that preserves the declining part of the validation curve."
         },
         {
           "name": "checkpoint_12",
           "profiles": [
             "conservative_archive"
+          ],
+          "buckets": [
+            "extras"
           ],
           "reason": "Last checkpoint before the run collapses to near-zero validation accuracy."
         },
@@ -210,6 +282,9 @@
             "balanced_local",
             "conservative_archive"
           ],
+          "buckets": [
+            "best_eval_loss_or_proxy"
+          ],
           "reason": "Best late-stage non-zero checkpoint in the recorded validation sweep."
         },
         {
@@ -218,8 +293,16 @@
             "balanced_local",
             "conservative_archive"
           ],
+          "buckets": [
+            "used_elsewhere",
+            "last"
+          ],
           "reason": "Final checkpoint used by downstream row-recompute scripts and the local materialized export."
         }
+      ],
+      "bucket_notes": [
+        "Comparable eval_loss is not recorded cleanly for GSM-Hard, so best_eval_loss_or_proxy uses the best late-stage non-zero checkpoint rather than the final length minimum.",
+        "checkpoint_4, checkpoint_24, and checkpoint_32 are the minimal balanced_local trio that cover best_acc, proxy-loss, and downstream-used final state."
       ],
       "notes": [
         "The recorded validation sweep favors early checkpoints, but downstream tooling and the local standard export both point at checkpoint_32."

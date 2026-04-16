@@ -13,6 +13,7 @@ cot: False
 no_thoughts: False
 no_cot: False
 use_chat_template: True
+answer_prefix: "In summary, "
 use_boxed_answer: True
 max_new_tokens: 1024
 

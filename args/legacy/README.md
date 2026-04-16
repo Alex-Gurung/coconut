@@ -16,3 +16,13 @@ The files here include:
 - Flawed Fictions training and eval configs
 - sweep configs
 - temporary smoke configs retained from earlier runs
+
+Compatibility notes:
+
+- chat-template legacy configs pin `answer_prefix: "In summary, "` where they
+  were historically using the fork-specific post-chattemplate format
+- non-chat legacy configs pin `answer_prefix: "### "` where they are intended
+  to preserve the older upstream-style formatting
+- legacy eval and `save_only_improve` configs pin `enable_gen_eval: true` so
+  they still run generation accuracy instead of inheriting the canonical train
+  default

@@ -5,11 +5,13 @@ save_path: YOUR_PATH_TO_SAVE_THE_MODEL
 name: prosqa-coconut
 
 only_eval: True
+enable_gen_eval: True
 
 coconut: True
 cot: False
 no_thoughts: False
 no_cot: False
+answer_prefix: "### "
 
 c_thought: 1
 epochs_per_stage: 5

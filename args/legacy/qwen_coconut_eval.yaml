@@ -5,6 +5,7 @@ save_path: /mnt/disk/coconut/checkpoints  # CHANGED: Your actual save path
 name: qwen-coconut                        # CHANGED: Descriptive name
 
 only_eval: True 
+enable_gen_eval: True
 
 # Performance optimizations
 use_ddp: False                            # CHANGED: Back to FSDP due to OOM with DDP
@@ -14,6 +15,7 @@ coconut: True
 cot: False
 no_thoughts: False
 no_cot: False
+answer_prefix: "### "
 
 c_thought: 2
 epochs_per_stage: 1                      # CHANGED: Only 1 epoch per stage for speed

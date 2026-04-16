@@ -67,6 +67,8 @@ def main() -> None:
                         help="Suffix appended to eval directory names (e.g. 'test' -> *-eval-ckpt_004-test).")
     parser.add_argument("--skip-existing", action="store_true",
                         help="Skip checkpoints that already have eval_outputs.json and collect their results.")
+    parser.add_argument("--list-only", action="store_true",
+                        help="Print the checkpoints that would be evaluated and exit without launching jobs.")
     parser.add_argument("--out", default=None, help="Output summary base path (no extension).")
     args = parser.parse_args()
 
@@ -84,6 +86,18 @@ def main() -> None:
         checkpoints = [c for c in checkpoints if _checkpoint_id(c) in keep]
         if not checkpoints:
             raise SystemExit(f"None of the requested checkpoint ids found in {save_dir}")
+
+    print(f"Train config: {args.train_config}")
+    print(f"Run directory: {save_dir}")
+    print(
+        "Checkpoint policy from config: "
+        f"save_every={base_cfg.get('save_every', 'n/a')}, "
+        f"save_only_improve={base_cfg.get('save_only_improve', 'n/a')}, "
+        f"num_epochs={base_cfg.get('num_epochs', 'n/a')}"
+    )
+    print(f"Discovered checkpoints ({len(checkpoints)}): {', '.join(checkpoints)}")
+    if args.list_only:
+        return
 
     gpus = [g.strip() for g in args.gpus.split(",") if g.strip() != ""]
     if not gpus:

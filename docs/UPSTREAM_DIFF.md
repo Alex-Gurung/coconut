@@ -1,11 +1,16 @@
 # Upstream Differences (This Repo vs Original COCONUT)
 
-Compared against: `/mnt/disk/old_coconut/coconut`
+Compared against: local branch `original_coconut`
+
+For the current primary GSM-Hard workflow, also see
+`experiments/gsm_hard_qwen3_4b/UPSTREAM_NOTES.md`.
 
 ## At a glance
 - Shared files changed: `run.py`, `dataset.py`, `coconut.py`, `README.md`
 - New tracked files in this repo: many configs/scripts/docs for Flawed Fictions and eval tooling
 - Root is intentionally cleaner: most utilities moved to `scripts/`, docs moved to `docs/`
+- For an exhaustive file-level inventory, run:
+  - `git diff --name-status original_coconut...HEAD`
 
 Core diff size (shared files):
 - `run.py`: `+409 / -101`
@@ -22,6 +27,7 @@ Core diff size (shared files):
   - DDP toggle (`use_ddp`) in addition to FSDP
   - `torch_compile` toggle
   - Liger kernel attempt at startup
+  - Flash Attention 2 model loading and immediate gradient-checkpointing enable
 - Added stronger validation/guardrails:
   - tokenizer/eos/special-token checks
   - optional smoke single-GPU guard
@@ -34,6 +40,9 @@ Core diff size (shared files):
   - `save_every`
   - `train_fraction`
   - non-default optional config logging at startup
+- Legacy compatibility pins now live in configs rather than hidden defaults:
+  - legacy `only_eval` configs explicitly set `enable_gen_eval: true`
+  - legacy `save_only_improve` configs that rely on accuracy likewise pin it
 
 ### Revert to original behavior
 Use config values that mimic upstream defaults:
@@ -44,6 +53,7 @@ Use config values that mimic upstream defaults:
 - `save_every: 1`
 - `train_fraction: null`
 - `max_new_tokens: null` (uses heuristic fallback)
+  - current heuristic is `64` for GSM paths and `2048` otherwise
 - `max_eval_samples: null` (full eval)
 
 ## 2) Behavioral changes in `dataset.py`
@@ -52,11 +62,18 @@ Use config values that mimic upstream defaults:
 - Added `use_chat_template` path in `get_dataset(...)`.
 - If enabled, tokenization uses `tokenizer.apply_chat_template(...)`.
 - Collator now ensures `token_type_ids` exists and shape-checks it.
-- Current answer prefix in this fork is `"In summary, "` (instead of old `"### "` formatting).
+- Added configurable `answer_prefix`.
+- The original upstream formatting used `"### "`.
+- Older runs in this fork often used `"In summary, "`.
+- Legacy chat-template configs under `args/legacy/` now pin that prefix
+  explicitly so canonical default changes do not silently rewrite old behavior.
+- The current canonical GSM-Hard workflow uses `answer_prefix: ""`.
+- Legacy non-chat configs that are meant to preserve the older upstream-style
+  formatting now pin `answer_prefix: "### "` explicitly.
 
 ### Revert to original behavior
 - Set `use_chat_template: false`.
-- If you need exact old formatting, switch answer tokenization back from `"In summary, "` to `"### "` in `dataset.py` (this is a code change, not just config).
+- Set `answer_prefix: "### "` if you want the original upstream answer marker.
 
 ## 3) Behavioral changes in `coconut.py`
 
@@ -99,10 +116,22 @@ Reference examples:
 ## 5) Repo structure differences
 
 ### What changed
+- Added `.gitignore` for local data, checkpoints, and generated artifacts.
+- Added `evalrun.py` as a compatibility wrapper around the unified `run.py`.
+- Added `experiments/` for canonical user-facing workflows:
+  - `experiments/gsm_hard_qwen3_4b/*`
 - Utilities moved from root to grouped folders:
   - `scripts/checks/`, `scripts/data/`, `scripts/eval/`, `scripts/sweeps/`, `scripts/train/`
 - Internal docs moved to `docs/`
 - Tests moved to `tests/`
+- Added repo navigation docs:
+  - `args/README.md`
+  - `args/legacy/README.md`
+  - `docs/README.md`
+  - `experiments/README.md`
+- Moved the original upstream example configs from `args/` into `args/legacy/`
+  and added many newer legacy configs for Qwen/Gemma/Flawed-Fictions work.
+- Removed bundled `data/prosqa_*.json` files from the tracked tree.
 
 ### Revert to original layout
 - Move those files back to repo root and update path references in scripts/docs.

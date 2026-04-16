@@ -74,15 +74,16 @@ def build_run_plan(run: dict, profile: str) -> dict:
         "keep_size_bytes": keep_size,
         "prune_size_bytes": prune_size,
         "hf_target": run.get("hf_target", {}),
+        "bucket_notes": run.get("bucket_notes", []),
         "notes": run.get("notes", []),
         "alternates": run.get("alternates", []),
         "keep": keep_items,
     }
 
 
-def print_text_report(manifest: dict, plans: list[dict], profile: str) -> None:
+def print_text_report(manifest: dict, plans: list[dict], profile: str, manifest_path: Path) -> None:
     print("Checkpoint prune plan (dry run only)")
-    print(f"Manifest: {DEFAULT_MANIFEST}")
+    print(f"Manifest: {manifest_path}")
     print(f"Profile: {profile}")
     profile_info = manifest.get("profiles", {}).get(profile, {})
     if profile_info.get("description"):
@@ -113,7 +114,11 @@ def print_text_report(manifest: dict, plans: list[dict], profile: str) -> None:
         )
         for item in plan["keep"]:
             if item["name"] in plan["keep_present"]:
-                print(f"  reason {item['name']}: {item['reason']}")
+                buckets = item.get("buckets", [])
+                bucket_text = f" [{', '.join(buckets)}]" if buckets else ""
+                print(f"  reason {item['name']}{bucket_text}: {item['reason']}")
+        for bucket_note in plan["bucket_notes"]:
+            print(f"  bucket_note: {bucket_note}")
         for note in plan["notes"]:
             print(f"  note: {note}")
         for alt in plan["alternates"]:
@@ -166,6 +171,7 @@ def main() -> None:
                     "generated_on": manifest.get("generated_on"),
                     "profile": profile,
                     "selection_basis": manifest.get("selection_basis", []),
+                    "selection_bucket_definitions": manifest.get("selection_bucket_definitions", {}),
                     "plans": plans,
                 },
                 indent=2,
@@ -173,7 +179,7 @@ def main() -> None:
         )
         return
 
-    print_text_report(manifest, plans, profile=profile)
+    print_text_report(manifest, plans, profile=profile, manifest_path=manifest_path)
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ coconut: True
 cot: False
 no_thoughts: False
 no_cot: False
+answer_prefix: "### "
 
 # Coconut curriculum settings
 # c_thought: 2  # 2 latent tokens per reasoning step

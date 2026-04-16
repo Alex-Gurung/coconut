@@ -20,7 +20,7 @@ def get_dataset(
     tokenizer,
     max_size=1000000000,
     use_chat_template=False,
-    answer_prefix="In summary, ",
+    answer_prefix="",
 ):
 
     def _format_answer_text(answer):

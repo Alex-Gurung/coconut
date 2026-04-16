@@ -11,8 +11,12 @@ cot: false
 no_thoughts: false
 no_cot: false
 use_chat_template: true
+# Historical fork option:
+# answer_prefix: "In summary, "
+answer_prefix: ""
 use_boxed_answer: true
 enable_gen_eval: false
+eval_do_sample: false
 max_new_tokens: 1024
 
 c_thought: 1

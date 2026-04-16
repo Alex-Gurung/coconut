@@ -66,7 +66,7 @@ OPTIONAL_CONFIG_DEFAULTS = {
     "eval_top_k": None,
     "use_chat_template": False,
     "use_boxed_answer": True,
-    "answer_prefix": "In summary, ",
+    "answer_prefix": "",
     "use_ddp": False,
     "torch_compile": False,
     "save_every": 1,
@@ -384,7 +384,7 @@ def main():
         tokenizer,
         max_size=max_eval_size,
         use_chat_template=use_chat_template,
-        answer_prefix=getattr(configs, "answer_prefix", "In summary, "),
+        answer_prefix=getattr(configs, "answer_prefix", ""),
     )
     if len(base_dataset_valid) == 0:
         raise ValueError(
@@ -407,7 +407,7 @@ def main():
             tokenizer,
             max_size=max_train_size,
             use_chat_template=use_chat_template,
-            answer_prefix=getattr(configs, "answer_prefix", "In summary, "),
+            answer_prefix=getattr(configs, "answer_prefix", ""),
         )
 
     if getattr(configs, "max_new_tokens", None) is not None:

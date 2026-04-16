@@ -10,6 +10,7 @@ coconut: True    # Enable coconut training method
 cot: False       # Skip CoT stage - your data already has reasoning from capable model
 no_thoughts: False
 no_cot: False
+answer_prefix: "### "
 
 # Training settings
 c_thought: 2                    # JUSTIFIED: Same as GSM8K (2). Start conservative, can increase
